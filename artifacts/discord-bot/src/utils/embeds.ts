@@ -157,14 +157,13 @@ export function buildHistoryEmbed(bets: Bet[], username: string): EmbedBuilder {
 export function buildLeaderboardEmbed(
   entries: LeaderboardEntry[],
   sortLabel: string,
-  client: import("discord.js").Client
+  names: Map<string, string>
 ): EmbedBuilder {
   const medals = ["🥇", "🥈", "🥉"];
 
   const embed = new EmbedBuilder()
     .setColor(MONEY_GREEN)
     .setTitle("🏆 The Society Book — Leaderboard")
-    .setDescription(`**Sorted by:** ${sortLabel}`)
     .setFooter({ text: "The 1912 Society Book" })
     .setTimestamp();
 
@@ -175,8 +174,7 @@ export function buildLeaderboardEmbed(
 
   const lines = entries.map((entry, i) => {
     const medal   = medals[i] ?? `**${i + 1}.**`;
-    const user    = client.users.cache.get(entry.id);
-    const name    = user?.username ?? `User ${entry.id.slice(-4)}`;
+    const name    = names.get(entry.id) ?? `User ${entry.id.slice(-4)}`;
     const winRate = formatWinRate(entry.total_wins, entry.total_bets);
     return [
       `${medal} **${name}**`,
