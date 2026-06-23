@@ -10,6 +10,7 @@ import readyEvent from "./events/ready.js";
 import interactionCreateEvent from "./events/interactionCreate.js";
 import messageCreateEvent from "./events/messageCreate.js";
 import messageReactionAddEvent from "./events/messageReactionAdd.js";
+import guildMemberAddEvent from "./events/guildMemberAdd.js";
 
 // ─── Validate Required Environment Variables ──────────────────────────────────
 
@@ -49,6 +50,7 @@ const eventModules: BotEvent[] = [
   interactionCreateEvent,
   messageCreateEvent,
   messageReactionAddEvent,
+  guildMemberAddEvent,
 ];
 
 for (const event of eventModules) {
