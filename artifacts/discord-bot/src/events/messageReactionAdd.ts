@@ -1,22 +1,16 @@
-/**
- * messageReactionAdd event — awards coins for reactions (given and received).
- * Enforces a 30-second cooldown for reaction-given to prevent farming.
- */
-
 import { Events, type MessageReaction, type User } from "discord.js";
+import type { BotEvent } from "../types.js";
 import {
   tryAwardReactionGivenCoins,
   awardReactionReceivedCoins,
 } from "../services/coinService.js";
 
-export default {
+const messageReactionAddEvent: BotEvent = {
   name: Events.MessageReactionAdd,
   once: false,
   async execute(reaction: MessageReaction, user: User) {
-    // Ignore bots
     if (user.bot) return;
 
-    // Fetch partial reaction if needed
     if (reaction.partial) {
       try {
         await reaction.fetch();
@@ -25,27 +19,23 @@ export default {
       }
     }
 
-    const message = reaction.message;
-    if (!message.guild) return; // DMs only — ignore
+    if (!reaction.message.guild) return;
 
-    // Fetch full message if partial
-    const fullMessage = message.partial ? await message.fetch().catch(() => null) : message;
+    const fullMessage = reaction.message.partial
+      ? await reaction.message.fetch().catch(() => null)
+      : reaction.message;
     if (!fullMessage) return;
 
-    const reactor = user;
     const author = fullMessage.author;
 
-    // Don't award coins for reacting to your own message or bots
-    if (!author || author.bot || author.id === reactor.id) {
-      // Still award the giver coins (it's engagement either way)
-      tryAwardReactionGivenCoins(reactor.id);
-      return;
+    // Award coins for giving a reaction (30s cooldown)
+    tryAwardReactionGivenCoins(user.id);
+
+    // Award the message author for receiving a reaction (no cooldown, no self-reactions)
+    if (author && !author.bot && author.id !== user.id) {
+      awardReactionReceivedCoins(author.id);
     }
-
-    // Award the person giving the reaction (subject to 30s cooldown)
-    tryAwardReactionGivenCoins(reactor.id);
-
-    // Award the person who received the reaction (no cooldown — passive income)
-    awardReactionReceivedCoins(author.id);
   },
 };
+
+export default messageReactionAddEvent;

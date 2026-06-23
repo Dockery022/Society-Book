@@ -1,17 +1,14 @@
 /**
  * deploy-commands.ts
- *
  * Registers slash commands with Discord's API.
- * Run this script whenever you add, modify, or remove slash commands.
  *
- * Usage:
- *   pnpm --filter @workspace/discord-bot run deploy-commands
+ * Guild registration (instant — recommended for dev):
+ *   Set DISCORD_GUILD_ID in your .env/.secrets
  *
- * Guild registration (instant, recommended for development/testing):
- *   Set DISCORD_GUILD_ID in your .env file.
+ * Global registration (up to 1h propagation):
+ *   Remove DISCORD_GUILD_ID
  *
- * Global registration (takes up to 1 hour to propagate):
- *   Remove DISCORD_GUILD_ID from your .env file.
+ * Run: pnpm --filter @workspace/discord-bot run deploy-commands
  */
 
 import "dotenv/config";
@@ -28,32 +25,20 @@ if (!token || !clientId) {
 }
 
 const rest = new REST().setToken(token);
-
 const commandData = commands.map((cmd) => cmd.data.toJSON());
 
-try {
-  console.log(`[Deploy] Registering ${commandData.length} slash commands…`);
+console.log(`[Deploy] Registering ${commandData.length} slash commands…`);
 
-  if (guildId) {
-    // Guild-specific registration (instant) — great for dev/testing
-    const data = await rest.put(
-      Routes.applicationGuildCommands(clientId, guildId),
-      { body: commandData }
-    );
-    console.log(
-      `[Deploy] ✅ Successfully registered ${(data as unknown[]).length} guild commands to guild ${guildId}.`
-    );
-  } else {
-    // Global registration (up to 1h propagation)
-    const data = await rest.put(
-      Routes.applicationCommands(clientId),
-      { body: commandData }
-    );
-    console.log(
-      `[Deploy] ✅ Successfully registered ${(data as unknown[]).length} global application commands.`
-    );
-  }
-} catch (error) {
-  console.error("[Deploy] Failed to register commands:", error);
-  process.exit(1);
+if (guildId) {
+  const data = (await rest.put(
+    Routes.applicationGuildCommands(clientId, guildId),
+    { body: commandData }
+  )) as unknown[];
+  console.log(`[Deploy] ✅ Registered ${data.length} guild commands to guild ${guildId}.`);
+} else {
+  const data = (await rest.put(
+    Routes.applicationCommands(clientId),
+    { body: commandData }
+  )) as unknown[];
+  console.log(`[Deploy] ✅ Registered ${data.length} global application commands.`);
 }

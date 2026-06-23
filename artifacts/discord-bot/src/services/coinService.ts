@@ -33,7 +33,7 @@ export function getBalance(userId: string): number {
 
 export function getUser(userId: string): User {
   ensureUser(userId);
-  return db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as User;
+  return db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as unknown as User;
 }
 
 export function addCoins(userId: string, amount: number, _reason?: string): void {
@@ -79,8 +79,7 @@ function checkCooldown(
     .get(userId, type) as { last_triggered: number } | undefined;
 
   if (!row) return { allowed: true };
-  const elapsed = now - row.last_triggered;
-  return { allowed: elapsed >= cooldownMs };
+  return { allowed: now - row.last_triggered >= cooldownMs };
 }
 
 function updateCooldown(userId: string, type: CooldownType): void {
@@ -180,5 +179,5 @@ export function getLeaderboard(
       `SELECT id, coins, lifetime_earned, lifetime_lost, total_bets, total_wins
        FROM users ORDER BY ${order} LIMIT ?`
     )
-    .all(limit) as LeaderboardEntry[];
+    .all(limit) as unknown as LeaderboardEntry[];
 }

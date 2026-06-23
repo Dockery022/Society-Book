@@ -3,6 +3,7 @@ import type { Command } from "../../types.js";
 import { setBetsLocked } from "../../services/bettingService.js";
 import { requireAdmin } from "../../utils/permissions.js";
 import { buildSuccessEmbed } from "../../utils/embeds.js";
+import db from "../../database/index.js";
 
 const command: Command = {
   adminOnly: true,
@@ -16,7 +17,6 @@ const command: Command = {
 
     setBetsLocked(false);
 
-    const db = (await import("../../database/index.js")).default;
     db.prepare(
       "INSERT INTO admin_logs (admin_id, action, details) VALUES (?, 'unlock_bets', ?)"
     ).run(interaction.user.id, "Bets unlocked by admin");

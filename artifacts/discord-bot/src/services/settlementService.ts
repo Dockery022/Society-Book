@@ -16,8 +16,6 @@ function getApiKey(): string {
   return key;
 }
 
-// ─── Fetch Completed Scores ───────────────────────────────────────────────────
-
 interface ScoreEvent {
   id: string;
   completed: boolean;
@@ -38,8 +36,6 @@ async function fetchCompletedScores(sportKey: string): Promise<ScoreEvent[]> {
   }
 }
 
-// ─── Determine Bet Outcome ────────────────────────────────────────────────────
-
 function determineBetOutcome(
   bet: Bet,
   homeScore: number,
@@ -57,15 +53,14 @@ function determineBetOutcome(
   if (bet_type === "spread") {
     const spread = line ?? 0;
     const pickedHome = team === home_team;
-    // Adjust scores by spread for the chosen side
-    const adjustedHome = pickedHome ? homeScore + spread : homeScore;
-    const adjustedAway = pickedHome ? awayScore : awayScore + Math.abs(spread);
     if (pickedHome) {
-      if (adjustedHome > awayScore) return "won";
-      if (adjustedHome < awayScore) return "lost";
+      const adj = homeScore + spread;
+      if (adj > awayScore) return "won";
+      if (adj < awayScore) return "lost";
     } else {
-      if (adjustedAway > homeScore) return "won";
-      if (adjustedAway < homeScore) return "lost";
+      const adj = awayScore + Math.abs(spread);
+      if (adj > homeScore) return "won";
+      if (adj < homeScore) return "lost";
     }
     return "push";
   }
@@ -81,8 +76,6 @@ function determineBetOutcome(
   return "lost";
 }
 
-// ─── Settle Bets for a Game ───────────────────────────────────────────────────
-
 export function settleGameBets(
   gameId: string,
   homeScore: number,
@@ -90,7 +83,7 @@ export function settleGameBets(
 ): { settled: number; paid: number } {
   const pendingBets = db
     .prepare("SELECT * FROM bets WHERE game_id = ? AND status = 'pending'")
-    .all(gameId) as Bet[];
+    .all(gameId) as unknown as Bet[];
 
   let settled = 0;
   let paid = 0;
@@ -124,15 +117,13 @@ export function settleGameBets(
   return { settled, paid };
 }
 
-// ─── Auto-Settlement Cron Job ─────────────────────────────────────────────────
-
 export function startSettlementScheduler(): void {
   cron.schedule("*/15 * * * *", async () => {
     console.log("[Settlement] Checking for completed games…");
 
     const pendingGames = db
       .prepare("SELECT DISTINCT game_id, sport FROM bets WHERE status = 'pending'")
-      .all() as { game_id: string; sport: string }[];
+      .all() as unknown as { game_id: string; sport: string }[];
 
     if (pendingGames.length === 0) return;
 

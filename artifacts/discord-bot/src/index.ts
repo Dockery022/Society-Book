@@ -1,12 +1,15 @@
 /**
  * The Society Book — Discord Bot Entry Point
- * A virtual sportsbook for The 1912 Society server.
  */
 
 import "dotenv/config";
 import { Client, Collection, GatewayIntentBits, Partials } from "discord.js";
-import type { BotClient, Command } from "./types.js";
+import type { BotClient, BotEvent, Command } from "./types.js";
 import { commands } from "./commands/index.js";
+import readyEvent from "./events/ready.js";
+import interactionCreateEvent from "./events/interactionCreate.js";
+import messageCreateEvent from "./events/messageCreate.js";
+import messageReactionAddEvent from "./events/messageReactionAdd.js";
 
 // ─── Validate Required Environment Variables ──────────────────────────────────
 
@@ -28,11 +31,7 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
   ],
-  partials: [
-    Partials.Message,
-    Partials.Channel,
-    Partials.Reaction,
-  ],
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 }) as BotClient;
 
 // ─── Register Commands ────────────────────────────────────────────────────────
@@ -45,15 +44,14 @@ for (const command of commands) {
 
 // ─── Register Event Handlers ──────────────────────────────────────────────────
 
-const eventModules = [
-  await import("./events/ready.js"),
-  await import("./events/interactionCreate.js"),
-  await import("./events/messageCreate.js"),
-  await import("./events/messageReactionAdd.js"),
+const eventModules: BotEvent[] = [
+  readyEvent,
+  interactionCreateEvent,
+  messageCreateEvent,
+  messageReactionAddEvent,
 ];
 
-for (const mod of eventModules) {
-  const event = mod.default;
+for (const event of eventModules) {
   if (event.once) {
     client.once(event.name, (...args) => event.execute(...args, client));
   } else {

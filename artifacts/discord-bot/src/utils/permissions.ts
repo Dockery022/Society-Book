@@ -1,14 +1,31 @@
 /**
  * Permissions — helper functions for role-based access
+ * Supports multiple premium role IDs via PREMIUM_ROLE_IDS (comma-separated)
+ * or the legacy PREMIUM_ROLE_ID variable.
  */
 
 import type { GuildMember, ChatInputCommandInteraction } from "discord.js";
 
-/** Check if a member has the premium role */
+/** Return all configured premium role IDs */
+function getPremiumRoleIds(): string[] {
+  // Support comma-separated list: PREMIUM_ROLE_IDS=123456,789012
+  const multi = process.env.PREMIUM_ROLE_IDS;
+  if (multi) {
+    return multi
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+  }
+  // Legacy single-role fallback
+  const single = process.env.PREMIUM_ROLE_ID;
+  return single ? [single] : [];
+}
+
+/** Check if a member has any premium role */
 export function isPremium(member: GuildMember): boolean {
-  const premiumRoleId = process.env.PREMIUM_ROLE_ID;
-  if (!premiumRoleId) return false;
-  return member.roles.cache.has(premiumRoleId);
+  const premiumRoleIds = getPremiumRoleIds();
+  if (premiumRoleIds.length === 0) return false;
+  return premiumRoleIds.some((id) => member.roles.cache.has(id));
 }
 
 /** Check if a member has administrator permissions */
@@ -31,7 +48,6 @@ export async function requireGuildMember(
     return null;
   }
 
-  // Fetch full member to get up-to-date roles
   try {
     const member = await interaction.guild.members.fetch(interaction.user.id);
     return member;
@@ -53,7 +69,8 @@ export async function requireAdmin(
 
   if (!isAdmin(member)) {
     await interaction.reply({
-      content: "❌ You need **Administrator** or **Manage Server** permission to use this command.",
+      content:
+        "❌ You need **Administrator** or **Manage Server** permission to use this command.",
       ephemeral: true,
     });
     return false;

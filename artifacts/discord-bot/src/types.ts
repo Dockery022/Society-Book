@@ -25,6 +25,15 @@ export interface Command {
   execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
 }
 
+// ─── Event Definition ─────────────────────────────────────────────────────────
+
+export interface BotEvent {
+  name: string;
+  once: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  execute: (...args: any[]) => void | Promise<void>;
+}
+
 // ─── Database Models ──────────────────────────────────────────────────────────
 
 export interface User {
@@ -45,7 +54,7 @@ export interface Cooldown {
 
 export interface DailyClaim {
   user_id: string;
-  last_claimed: string; // YYYY-MM-DD
+  last_claimed: string;
 }
 
 export interface Bet {
@@ -54,9 +63,9 @@ export interface Bet {
   game_id: string;
   sport: string;
   bet_type: "moneyline" | "spread" | "total";
-  team: string; // team name, or "over"/"under"
-  line: number | null; // spread or total line
-  odds: number; // American odds
+  team: string;
+  line: number | null;
+  odds: number;
   amount: number;
   potential_return: number;
   status: "pending" | "won" | "lost" | "cancelled" | "void";
@@ -73,7 +82,7 @@ export interface Game {
   home_team: string;
   away_team: string;
   commence_time: number;
-  completed: number; // 0 or 1
+  completed: number;
   home_score: number | null;
   away_score: number | null;
   last_updated: number;
@@ -88,26 +97,12 @@ export interface AdminLog {
   created_at: number;
 }
 
-export interface BotSetting {
-  key: string;
-  value: string;
-}
-
 // ─── Odds API Types ───────────────────────────────────────────────────────────
-
-export interface OddsApiSport {
-  key: string;
-  group: string;
-  title: string;
-  description: string;
-  active: boolean;
-  has_outrights: boolean;
-}
 
 export interface OddsApiOutcome {
   name: string;
-  price: number; // American odds
-  point?: number; // spread or total line
+  price: number;
+  point?: number;
 }
 
 export interface OddsApiMarket {
@@ -127,7 +122,7 @@ export interface OddsApiGame {
   id: string;
   sport_key: string;
   sport_title: string;
-  commence_time: string; // ISO 8601
+  commence_time: string;
   home_team: string;
   away_team: string;
   bookmakers: OddsApiBookmaker[];

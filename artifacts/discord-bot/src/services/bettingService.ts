@@ -50,22 +50,32 @@ export function placeBet(userId: string, slip: BetSlip): PlaceBetResult {
   }
 
   const potentialReturn = calcPotentialReturn(slip.odds, slip.amount);
-
-  let betId: number;
+  let betId = 0;
 
   transaction(() => {
     coinService.removeCoins(userId, slip.amount);
     coinService.recordBetPlace(userId);
 
-    const result = db.prepare(`
-      INSERT INTO bets (user_id, game_id, sport, bet_type, team, line, odds, amount,
-        potential_return, status, home_team, away_team, commence_time)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
-    `).run(
-      userId, slip.gameId, slip.sport, slip.betType, slip.team,
-      slip.line ?? null, slip.odds, slip.amount, potentialReturn,
-      slip.homeTeam, slip.awayTeam, slip.commenceTime
-    );
+    const result = db
+      .prepare(
+        `INSERT INTO bets (user_id, game_id, sport, bet_type, team, line, odds, amount,
+          potential_return, status, home_team, away_team, commence_time)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
+      )
+      .run(
+        userId,
+        slip.gameId,
+        slip.sport,
+        slip.betType,
+        slip.team,
+        slip.line ?? null,
+        slip.odds,
+        slip.amount,
+        potentialReturn,
+        slip.homeTeam,
+        slip.awayTeam,
+        slip.commenceTime
+      );
 
     betId = Number(result.lastInsertRowid);
 
@@ -74,7 +84,9 @@ export function placeBet(userId: string, slip: BetSlip): PlaceBetResult {
     ).run(slip.gameId, slip.sport, slip.homeTeam, slip.awayTeam, slip.commenceTime);
   })();
 
-  const bet = db.prepare("SELECT * FROM bets WHERE id = ?").get(betId!) as Bet;
+  const bet = db
+    .prepare("SELECT * FROM bets WHERE id = ?")
+    .get(betId) as unknown as Bet;
   return { success: true, bet };
 }
 
@@ -83,22 +95,28 @@ export function placeBet(userId: string, slip: BetSlip): PlaceBetResult {
 export function getUserBets(userId: string, status?: string, limit = 10): Bet[] {
   if (status) {
     return db
-      .prepare("SELECT * FROM bets WHERE user_id = ? AND status = ? ORDER BY created_at DESC LIMIT ?")
-      .all(userId, status, limit) as Bet[];
+      .prepare(
+        "SELECT * FROM bets WHERE user_id = ? AND status = ? ORDER BY created_at DESC LIMIT ?"
+      )
+      .all(userId, status, limit) as unknown as Bet[];
   }
   return db
     .prepare("SELECT * FROM bets WHERE user_id = ? ORDER BY created_at DESC LIMIT ?")
-    .all(userId, limit) as Bet[];
+    .all(userId, limit) as unknown as Bet[];
 }
 
 export function getBetById(betId: number): Bet | null {
-  return (db.prepare("SELECT * FROM bets WHERE id = ?").get(betId) as Bet | undefined) ?? null;
+  return (
+    (db
+      .prepare("SELECT * FROM bets WHERE id = ?")
+      .get(betId) as unknown as Bet | undefined) ?? null
+  );
 }
 
 export function getPendingBetsForGame(gameId: string): Bet[] {
   return db
     .prepare("SELECT * FROM bets WHERE game_id = ? AND status = 'pending'")
-    .all(gameId) as Bet[];
+    .all(gameId) as unknown as Bet[];
 }
 
 // ─── Cancel Bet ───────────────────────────────────────────────────────────────
@@ -117,7 +135,9 @@ export function cancelBet(betId: number, adminId?: string): CancelBetResult {
   }
 
   transaction(() => {
-    db.prepare("UPDATE bets SET status = 'cancelled', settled_at = unixepoch() WHERE id = ?").run(betId);
+    db.prepare(
+      "UPDATE bets SET status = 'cancelled', settled_at = unixepoch() WHERE id = ?"
+    ).run(betId);
     coinService.addCoins(bet.user_id, bet.amount);
 
     if (adminId) {
@@ -151,7 +171,9 @@ export function manualSettleBet(
   }
 
   transaction(() => {
-    db.prepare("UPDATE bets SET status = ?, settled_at = unixepoch() WHERE id = ?").run(outcome, betId);
+    db.prepare(
+      "UPDATE bets SET status = ?, settled_at = unixepoch() WHERE id = ?"
+    ).run(outcome, betId);
 
     if (outcome === "won") {
       coinService.addCoins(bet.user_id, bet.potential_return);
