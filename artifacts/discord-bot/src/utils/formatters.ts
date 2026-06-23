@@ -4,10 +4,11 @@
 
 import type { Bet } from "../types.js";
 import { SUPPORTED_SPORTS } from "../types.js";
+import { getCoinEmoji } from "../services/emojiService.js";
 
 /** Format a coin amount with thousands separators and coin emoji */
 export function formatCoins(amount: number): string {
-  return `🪙 ${amount.toLocaleString()} coins`;
+  return `${getCoinEmoji(amount)} ${amount.toLocaleString()}`;
 }
 
 /** Format American odds for display (+150 / -110) */
