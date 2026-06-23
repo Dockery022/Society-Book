@@ -28,8 +28,29 @@ export function isPremium(member: GuildMember): boolean {
   return premiumRoleIds.some((id) => member.roles.cache.has(id));
 }
 
-/** Check if a member has administrator permissions */
+/** Return all configured admin role IDs */
+function getAdminRoleIds(): string[] {
+  const val = process.env.ADMIN_ROLE_IDS;
+  if (val) return val.split(",").map((id) => id.trim()).filter(Boolean);
+  return [];
+}
+
+/** Return all configured moderator role IDs */
+function getModeratorRoleIds(): string[] {
+  const val = process.env.MODERATOR_ROLE_IDS;
+  if (val) return val.split(",").map((id) => id.trim()).filter(Boolean);
+  return [];
+}
+
+/**
+ * Check if a member has admin access.
+ * Includes: server owner, ADMIN_ROLE_IDS roles,
+ * Administrator permission, or Manage Server permission.
+ */
 export function isAdmin(member: GuildMember): boolean {
+  if (member.guild.ownerId === member.id) return true;
+  const adminRoles = getAdminRoleIds();
+  if (adminRoles.length > 0 && adminRoles.some((id) => member.roles.cache.has(id))) return true;
   return (
     member.permissions.has("Administrator") ||
     member.permissions.has("ManageGuild")
@@ -38,14 +59,14 @@ export function isAdmin(member: GuildMember): boolean {
 
 /**
  * Check if a member is a moderator or higher.
- * Includes: server owner, Administrator, Manage Server,
- * Kick Members, or Ban Members.
+ * Includes: anyone who passes isAdmin(), MODERATOR_ROLE_IDS roles,
+ * or Kick Members / Ban Members permissions.
  */
 export function isModerator(member: GuildMember): boolean {
-  if (member.guild.ownerId === member.id) return true;
+  if (isAdmin(member)) return true;
+  const modRoles = getModeratorRoleIds();
+  if (modRoles.length > 0 && modRoles.some((id) => member.roles.cache.has(id))) return true;
   return (
-    member.permissions.has("Administrator") ||
-    member.permissions.has("ManageGuild") ||
     member.permissions.has("KickMembers") ||
     member.permissions.has("BanMembers")
   );
