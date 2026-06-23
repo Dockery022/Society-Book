@@ -25,6 +25,7 @@ import {
 import { getMarket, getBestBookmaker } from "../services/oddsService.js";
 
 const BRAND_COLOR = 0x1a2332; // Deep navy — The 1912 Society
+const MONEY_GREEN = 0x2ecc71; // Money green — game odds embeds
 const WIN_COLOR = 0x2ecc71;
 const LOSS_COLOR = 0xe74c3c;
 const NEUTRAL_COLOR = 0x95a5a6;
@@ -200,7 +201,7 @@ export function buildGameEmbed(game: OddsApiGame): EmbedBuilder {
   const bm = getBestBookmaker(game);
 
   const embed = new EmbedBuilder()
-    .setColor(BRAND_COLOR)
+    .setColor(MONEY_GREEN)
     .setTitle(`🎰 ${game.away_team} @ ${game.home_team}`)
     .setDescription(
       `**${formatSport(game.sport_key)}** · ${formatDateTime(commence)} (${formatRelativeTime(commence)})`
