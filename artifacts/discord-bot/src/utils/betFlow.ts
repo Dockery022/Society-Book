@@ -224,6 +224,6 @@ export async function showAmountModal(
   const username = originalInteraction.member
     ? (originalInteraction.member as import("discord.js").GuildMember).displayName
     : originalInteraction.user.username;
-  slipEmbed.setTitle(`✅ Bet placed by ${username} — Slip #${result.bet.id}`);
+  slipEmbed.setTitle(`✅ Bet placed by ${username}`);
   await originalInteraction.editReply({ embeds: [slipEmbed], components: [] });
 }
