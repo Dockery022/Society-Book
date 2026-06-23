@@ -5,6 +5,7 @@ import {
   ActionRowBuilder,
   ComponentType,
   EmbedBuilder,
+  type AutocompleteInteraction,
 } from "discord.js";
 import type { Command, OddsApiGame } from "../types.js";
 import { SUPPORTED_SPORTS, SPORT_EMOJIS } from "../types.js";
@@ -13,6 +14,58 @@ import { areBetsLocked } from "../services/bettingService.js";
 import { buildGameEmbed, buildErrorEmbed } from "../utils/embeds.js";
 import { isoToUnix } from "../utils/formatters.js";
 import { showSelectionMenu, type MarketKey } from "../utils/betFlow.js";
+
+// ── NCAA sports that support team search ──────────────────────────────────────
+const NCAA_SPORTS = new Set(["americanfootball_ncaaf", "basketball_ncaab"]);
+
+// ── Short-lived autocomplete cache (5-min TTL) ────────────────────────────────
+const gameCache = new Map<string, { games: OddsApiGame[]; expires: number }>();
+
+async function getCachedGames(sportKey: string): Promise<OddsApiGame[]> {
+  const cached = gameCache.get(sportKey);
+  if (cached && cached.expires > Date.now()) return cached.games;
+  const games = await getGamesWithOdds(sportKey);
+  gameCache.set(sportKey, { games, expires: Date.now() + 5 * 60 * 1000 });
+  return games;
+}
+
+// ── Autocomplete handler ──────────────────────────────────────────────────────
+async function handleAutocomplete(interaction: AutocompleteInteraction): Promise<void> {
+  const sportKey = interaction.options.getString("sport") ?? "";
+  const query = interaction.options.getFocused().toLowerCase().trim();
+
+  if (!NCAA_SPORTS.has(sportKey)) {
+    await interaction.respond([]);
+    return;
+  }
+
+  let games: OddsApiGame[];
+  try {
+    games = await getCachedGames(sportKey);
+  } catch {
+    await interaction.respond([]);
+    return;
+  }
+
+  const now = Date.now();
+  const upcoming = games.filter((g) => new Date(g.commence_time).getTime() > now);
+
+  // Collect unique team names that match the query
+  const teamSet = new Set<string>();
+  for (const g of upcoming) {
+    teamSet.add(g.home_team);
+    teamSet.add(g.away_team);
+  }
+
+  const matches = [...teamSet]
+    .filter((t) => !query || t.toLowerCase().includes(query))
+    .sort()
+    .slice(0, 25);
+
+  await interaction.respond(matches.map((t) => ({ name: t, value: t })));
+}
+
+// ── Command ───────────────────────────────────────────────────────────────────
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -26,15 +79,25 @@ const command: Command = {
         .addChoices(
           ...Object.entries(SUPPORTED_SPORTS).map(([key, name]) => ({ name, value: key }))
         )
+    )
+    .addStringOption((opt) =>
+      opt
+        .setName("team")
+        .setDescription("NCAA only — search for a specific team")
+        .setRequired(false)
+        .setAutocomplete(true)
     ),
+
+  autocomplete: handleAutocomplete,
 
   async execute(interaction) {
     const sportKey = interaction.options.getString("sport", true);
+    const teamFilter = interaction.options.getString("team")?.toLowerCase().trim() ?? null;
     await interaction.deferReply();
 
     let games: OddsApiGame[];
     try {
-      games = await getGamesWithOdds(sportKey);
+      games = await getCachedGames(sportKey);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       await interaction.editReply({
@@ -44,27 +107,38 @@ const command: Command = {
     }
 
     const now = Date.now();
-    const upcoming = games
+    let upcoming = games
       .filter((g) => new Date(g.commence_time).getTime() > now)
-      .sort((a, b) => new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime())
-      .slice(0, 25);
+      .sort((a, b) => new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime());
+
+    // Apply team filter for NCAA searches
+    if (teamFilter) {
+      upcoming = upcoming.filter(
+        (g) =>
+          g.home_team.toLowerCase().includes(teamFilter) ||
+          g.away_team.toLowerCase().includes(teamFilter)
+      );
+    }
+
+    upcoming = upcoming.slice(0, 25);
 
     if (upcoming.length === 0) {
+      const notFoundMsg = teamFilter
+        ? `No upcoming games found for **${interaction.options.getString("team")}**.`
+        : `No upcoming ${SUPPORTED_SPORTS[sportKey]} games with odds available right now.`;
       await interaction.editReply({
         embeds: [
           new EmbedBuilder()
             .setColor(0x95a5a6)
-            .setTitle("No Upcoming Games")
-            .setDescription(
-              `No upcoming ${SUPPORTED_SPORTS[sportKey]} games with odds available right now.`
-            )
+            .setTitle("No Games Found")
+            .setDescription(notFoundMsg)
             .setFooter({ text: "The 1912 Society Book" }),
         ],
       });
       return;
     }
 
-    // ── Build game select row ──────────────────────────────────────────────────
+    // ── Game select row ────────────────────────────────────────────────────────
     const sportEmoji = SPORT_EMOJIS[sportKey] ?? "🏟️";
     const buildGameRow = (selectedId?: string) =>
       new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
@@ -90,7 +164,7 @@ const command: Command = {
           )
       );
 
-    // ── Build market select row ────────────────────────────────────────────────
+    // ── Market select row ──────────────────────────────────────────────────────
     const marketRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId("game_market")
@@ -111,14 +185,12 @@ const command: Command = {
         )
     );
 
-    // Show first game by default
     let currentGame = upcoming[0]!;
     const reply = await interaction.editReply({
       embeds: [buildGameEmbed(currentGame)],
       components: [buildGameRow(currentGame.id), marketRow],
     });
 
-    // ── Collector for both dropdowns ───────────────────────────────────────────
     const collector = reply.createMessageComponentCollector({
       componentType: ComponentType.StringSelect,
       time: 120_000,
@@ -126,7 +198,6 @@ const command: Command = {
     });
 
     collector.on("collect", async (selectInteraction) => {
-      // Game switcher
       if (selectInteraction.customId === "game_select") {
         const gameId = selectInteraction.values[0]!;
         currentGame = upcoming.find((g) => g.id === gameId) ?? currentGame;
@@ -137,7 +208,6 @@ const command: Command = {
         return;
       }
 
-      // Market picker — hand off to the shared bet flow
       if (selectInteraction.customId === "game_market") {
         if (areBetsLocked()) {
           await selectInteraction.update({
@@ -150,21 +220,13 @@ const command: Command = {
 
         const marketKey = selectInteraction.values[0]! as MarketKey;
         collector.stop("market_selected");
-        await showSelectionMenu(
-          selectInteraction,
-          currentGame,
-          sportKey,
-          marketKey,
-          interaction
-        );
+        await showSelectionMenu(selectInteraction, currentGame, sportKey, marketKey, interaction);
       }
     });
 
     collector.on("end", async (_, reason) => {
       if (reason === "time") {
-        try {
-          await interaction.editReply({ components: [] });
-        } catch { /* ignored */ }
+        try { await interaction.editReply({ components: [] }); } catch { /* ignored */ }
       }
     });
   },

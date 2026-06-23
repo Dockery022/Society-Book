@@ -6,6 +6,19 @@ const interactionCreateEvent: BotEvent = {
   name: Events.InteractionCreate,
   once: false,
   async execute(interaction: Interaction, client: BotClient) {
+    // Autocomplete
+    if (interaction.isAutocomplete()) {
+      const command = client.commands.get(interaction.commandName);
+      if (command?.autocomplete) {
+        try {
+          await command.autocomplete(interaction);
+        } catch {
+          // Silently ignore autocomplete errors — they expire naturally
+        }
+      }
+      return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const command = client.commands.get(interaction.commandName);

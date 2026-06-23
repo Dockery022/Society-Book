@@ -205,7 +205,7 @@ export function buildGameEmbed(game: OddsApiGame): EmbedBuilder {
     .setDescription(
       `**${formatSport(game.sport_key)}** · ${formatDateTime(commence)} (${formatRelativeTime(commence)})`
     )
-    .setFooter({ text: `ID: ${game.id} · The 1912 Society Book` })
+    .setFooter({ text: "The 1912 Society Book" })
     .setTimestamp();
 
   if (!bm) {
