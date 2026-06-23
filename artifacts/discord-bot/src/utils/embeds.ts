@@ -4,7 +4,6 @@
 
 import {
   EmbedBuilder,
-  Colors,
 } from "discord.js";
 import type { Bet, User } from "../types.js";
 import type { LeaderboardEntry } from "../services/coinService.js";
@@ -24,29 +23,32 @@ import {
 } from "./formatters.js";
 import { getMarket, getBestBookmaker } from "../services/oddsService.js";
 
-const BRAND_COLOR = 0x1a2332; // Deep navy — The 1912 Society
-const MONEY_GREEN = 0x2ecc71; // Money green — game odds embeds
-const WIN_COLOR = 0x2ecc71;
-const LOSS_COLOR = 0xe74c3c;
+const MONEY_GREEN = 0x2ecc71; // Money green — used for all embeds
+const WIN_COLOR   = 0x2ecc71;
+const LOSS_COLOR  = 0xe74c3c;
 const NEUTRAL_COLOR = 0x95a5a6;
 
 // ─── Balance Embed ────────────────────────────────────────────────────────────
 
 export function buildBalanceEmbed(user: User, username: string): EmbedBuilder {
   const winRate = formatWinRate(user.total_wins, user.total_bets);
-  const profit = user.lifetime_earned - user.lifetime_lost - 500; // subtract starting balance
+  const profit = user.lifetime_earned - user.lifetime_lost - 500;
 
   return new EmbedBuilder()
-    .setColor(BRAND_COLOR)
+    .setColor(MONEY_GREEN)
     .setTitle("🏦 The Society Book — Wallet")
     .setDescription(`**${username}'s** account`)
     .addFields(
-      { name: "Current Balance", value: formatCoins(user.coins), inline: true },
-      { name: "Lifetime Earned", value: formatCoins(user.lifetime_earned), inline: true },
-      { name: "\u200b", value: "\u200b", inline: true },
-      { name: "Total Bets", value: user.total_bets.toLocaleString(), inline: true },
-      { name: "Win Rate", value: winRate, inline: true },
-      { name: "Net Profit", value: `${profit >= 0 ? "+" : ""}${formatCoins(profit)}`, inline: true }
+      { name: "Current Balance",  value: formatCoins(user.coins),          inline: true },
+      { name: "Lifetime Earned",  value: formatCoins(user.lifetime_earned), inline: true },
+      { name: "\u200b",           value: "\u200b",                          inline: true },
+      { name: "Total Bets",       value: user.total_bets.toLocaleString(),  inline: true },
+      { name: "Win Rate",         value: winRate,                           inline: true },
+      {
+        name: "Net Profit",
+        value: `${profit >= 0 ? "+" : ""}${formatCoins(profit)}`,
+        inline: true,
+      }
     )
     .setFooter({ text: "The 1912 Society Book" })
     .setTimestamp();
@@ -56,34 +58,26 @@ export function buildBalanceEmbed(user: User, username: string): EmbedBuilder {
 
 export function buildBetSlipEmbed(bet: Bet): EmbedBuilder {
   const colorMap: Record<string, number> = {
-    pending: BRAND_COLOR,
-    won: WIN_COLOR,
-    lost: LOSS_COLOR,
+    pending:   MONEY_GREEN,
+    won:       WIN_COLOR,
+    lost:      LOSS_COLOR,
     cancelled: NEUTRAL_COLOR,
-    void: NEUTRAL_COLOR,
+    void:      NEUTRAL_COLOR,
   };
 
   const embed = new EmbedBuilder()
-    .setColor(colorMap[bet.status] ?? BRAND_COLOR)
+    .setColor(colorMap[bet.status] ?? MONEY_GREEN)
     .setTitle(`📋 Bet Slip — #${bet.id}`)
     .addFields(
-      {
-        name: "Matchup",
-        value: `${bet.home_team} vs ${bet.away_team}`,
-        inline: false,
-      },
-      { name: "Sport", value: formatSport(bet.sport), inline: true },
-      { name: "Market", value: formatBetType(bet.bet_type), inline: true },
-      { name: "Selection", value: formatBetSelection(bet), inline: true },
-      { name: "Odds", value: formatOdds(bet.odds), inline: true },
-      { name: "Wager", value: formatCoins(bet.amount), inline: true },
-      { name: "Potential Return", value: formatCoins(bet.potential_return), inline: true },
-      { name: "Status", value: formatBetStatus(bet.status), inline: true },
-      {
-        name: "Game Time",
-        value: formatDateTime(bet.commence_time),
-        inline: true,
-      }
+      { name: "Matchup",          value: `${bet.home_team} vs ${bet.away_team}`, inline: false },
+      { name: "Sport",            value: formatSport(bet.sport),                  inline: true  },
+      { name: "Market",           value: formatBetType(bet.bet_type),             inline: true  },
+      { name: "Selection",        value: formatBetSelection(bet),                  inline: true  },
+      { name: "Odds",             value: formatOdds(bet.odds),                    inline: true  },
+      { name: "Wager",            value: formatCoins(bet.amount),                 inline: true  },
+      { name: "Potential Return", value: formatCoins(bet.potential_return),        inline: true  },
+      { name: "Status",           value: formatBetStatus(bet.status),             inline: true  },
+      { name: "Game Time",        value: formatDateTime(bet.commence_time),       inline: true  },
     )
     .setFooter({ text: "The 1912 Society Book" })
     .setTimestamp(bet.created_at * 1000);
@@ -100,14 +94,14 @@ export function buildBetSlipEmbed(bet: Bet): EmbedBuilder {
 
 export function buildBetsListEmbed(bets: Bet[], username: string, title: string): EmbedBuilder {
   const embed = new EmbedBuilder()
-    .setColor(BRAND_COLOR)
+    .setColor(MONEY_GREEN)
     .setTitle(title)
     .setDescription(bets.length === 0 ? "No bets found." : null)
     .setFooter({ text: `${username} • The 1912 Society Book` })
     .setTimestamp();
 
   for (const bet of bets.slice(0, 10)) {
-    const matchup = `${bet.home_team} vs ${bet.away_team}`;
+    const matchup   = `${bet.home_team} vs ${bet.away_team}`;
     const selection = formatBetSelection(bet);
     embed.addFields({
       name: `#${bet.id} — ${formatBetStatus(bet.status)}`,
@@ -127,7 +121,7 @@ export function buildBetsListEmbed(bets: Bet[], username: string, title: string)
 // ─── History Embed ────────────────────────────────────────────────────────────
 
 export function buildHistoryEmbed(bets: Bet[], username: string): EmbedBuilder {
-  const settled = bets.filter((b) => b.status === "won" || b.status === "lost");
+  const settled    = bets.filter((b) => b.status === "won" || b.status === "lost");
   const totalProfit = settled.reduce((sum, b) => sum + calcProfitLoss(b), 0);
 
   const embed = new EmbedBuilder()
@@ -143,7 +137,7 @@ export function buildHistoryEmbed(bets: Bet[], username: string): EmbedBuilder {
 
   for (const bet of bets.slice(0, 10)) {
     const matchup = `${bet.home_team} vs ${bet.away_team}`;
-    const pl = calcProfitLoss(bet);
+    const pl      = calcProfitLoss(bet);
     embed.addFields({
       name: `#${bet.id} — ${formatBetStatus(bet.status)}`,
       value: [
@@ -168,7 +162,7 @@ export function buildLeaderboardEmbed(
   const medals = ["🥇", "🥈", "🥉"];
 
   const embed = new EmbedBuilder()
-    .setColor(0xf1c40f) // Gold
+    .setColor(MONEY_GREEN)
     .setTitle("🏆 The Society Book — Leaderboard")
     .setDescription(`**Sorted by:** ${sortLabel}`)
     .setFooter({ text: "The 1912 Society Book" })
@@ -180,9 +174,9 @@ export function buildLeaderboardEmbed(
   }
 
   const lines = entries.map((entry, i) => {
-    const medal = medals[i] ?? `**${i + 1}.**`;
-    const user = client.users.cache.get(entry.id);
-    const name = user?.username ?? `User ${entry.id.slice(-4)}`;
+    const medal   = medals[i] ?? `**${i + 1}.**`;
+    const user    = client.users.cache.get(entry.id);
+    const name    = user?.username ?? `User ${entry.id.slice(-4)}`;
     const winRate = formatWinRate(entry.total_wins, entry.total_bets);
     return [
       `${medal} **${name}**`,
@@ -198,7 +192,7 @@ export function buildLeaderboardEmbed(
 
 export function buildGameEmbed(game: OddsApiGame): EmbedBuilder {
   const commence = isoToUnix(game.commence_time);
-  const bm = getBestBookmaker(game);
+  const bm       = getBestBookmaker(game);
 
   const embed = new EmbedBuilder()
     .setColor(MONEY_GREEN)
@@ -214,7 +208,6 @@ export function buildGameEmbed(game: OddsApiGame): EmbedBuilder {
     return embed;
   }
 
-  // Moneyline
   const h2h = bm.markets.find((m) => m.key === "h2h");
   if (h2h) {
     const away = h2h.outcomes.find((o) => o.name === game.away_team);
@@ -226,11 +219,10 @@ export function buildGameEmbed(game: OddsApiGame): EmbedBuilder {
     });
   }
 
-  // Spread
   const spreads = bm.markets.find((m) => m.key === "spreads");
   if (spreads) {
-    const away = spreads.outcomes.find((o) => o.name === game.away_team);
-    const home = spreads.outcomes.find((o) => o.name === game.home_team);
+    const away    = spreads.outcomes.find((o) => o.name === game.away_team);
+    const home    = spreads.outcomes.find((o) => o.name === game.home_team);
     const awayPts = away?.point ?? 0;
     const homePts = home?.point ?? 0;
     embed.addFields({
@@ -240,10 +232,9 @@ export function buildGameEmbed(game: OddsApiGame): EmbedBuilder {
     });
   }
 
-  // Total
   const totals = bm.markets.find((m) => m.key === "totals");
   if (totals) {
-    const over = totals.outcomes.find((o) => o.name === "Over");
+    const over  = totals.outcomes.find((o) => o.name === "Over");
     const under = totals.outcomes.find((o) => o.name === "Under");
     embed.addFields({
       name: "🔢 Over/Under",
@@ -270,7 +261,7 @@ export function buildErrorEmbed(message: string): EmbedBuilder {
 
 export function buildSuccessEmbed(title: string, message: string): EmbedBuilder {
   return new EmbedBuilder()
-    .setColor(WIN_COLOR)
+    .setColor(MONEY_GREEN)
     .setTitle(`✅ ${title}`)
     .setDescription(message)
     .setFooter({ text: "The 1912 Society Book" });

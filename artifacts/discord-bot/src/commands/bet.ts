@@ -48,7 +48,7 @@ async function showSportSelect(interaction: ChatInputCommandInteraction): Promis
     );
 
   const embed = new EmbedBuilder()
-    .setColor(0x1a2332)
+    .setColor(0x2ecc71)
     .setTitle("🎰 Place a Bet — Step 1 of 4")
     .setDescription("Select a **sport** to browse upcoming games.")
     .setFooter({ text: "The 1912 Society Book • This menu expires in 3 minutes" });
@@ -86,7 +86,7 @@ async function showGameSelect(
   await interaction.update({
     embeds: [
       new EmbedBuilder()
-        .setColor(0x1a2332)
+        .setColor(0x2ecc71)
         .setTitle("🎰 Place a Bet — Step 2 of 4")
         .setDescription(`Fetching **${SUPPORTED_SPORTS[sportKey]}** games…`),
     ],
@@ -144,7 +144,7 @@ async function showGameSelect(
   const reply = await originalInteraction.editReply({
     embeds: [
       new EmbedBuilder()
-        .setColor(0x1a2332)
+        .setColor(0x2ecc71)
         .setTitle("🎰 Place a Bet — Step 2 of 4")
         .setDescription(`**${SUPPORTED_SPORTS[sportKey]}** — Select a game to bet on.`)
         .setFooter({ text: "The 1912 Society Book" }),
@@ -176,7 +176,7 @@ async function showMarketSelect(
   const commence = isoToUnix(game.commence_time);
 
   const embed = new EmbedBuilder()
-    .setColor(0x1a2332)
+    .setColor(0x2ecc71)
     .setTitle("🎰 Place a Bet — Step 3 of 4")
     .setDescription(
       `**${game.away_team} @ ${game.home_team}**\n${formatDateTime(commence)}\n\nSelect a **market** to bet on.`

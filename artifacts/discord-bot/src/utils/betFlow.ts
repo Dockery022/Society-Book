@@ -87,7 +87,7 @@ export async function showSelectionMenu(
   const commence = isoToUnix(game.commence_time);
 
   const embed = new EmbedBuilder()
-    .setColor(0x1a2332)
+    .setColor(0x2ecc71)
     .setTitle("🎰 Place a Bet")
     .setDescription(
       [
@@ -221,6 +221,9 @@ export async function showAmountModal(
   }
 
   const slipEmbed = buildBetSlipEmbed(result.bet);
-  slipEmbed.setTitle("✅ Bet Placed! — Bet Slip #" + result.bet.id);
+  const username = originalInteraction.member
+    ? (originalInteraction.member as import("discord.js").GuildMember).displayName
+    : originalInteraction.user.username;
+  slipEmbed.setTitle(`✅ Bet placed by ${username} — Slip #${result.bet.id}`);
   await originalInteraction.editReply({ embeds: [slipEmbed], components: [] });
 }
