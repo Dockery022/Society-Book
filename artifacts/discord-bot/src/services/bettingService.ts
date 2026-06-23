@@ -150,6 +150,37 @@ export function cancelBet(betId: number, adminId?: string): CancelBetResult {
   return { success: true, refunded: bet.amount };
 }
 
+// ─── Cancel All Pending Bets ──────────────────────────────────────────────────
+
+export interface CancelAllResult {
+  cancelled: number;
+  totalRefunded: number;
+}
+
+export function cancelAllPendingBets(adminId: string): CancelAllResult {
+  const pending = db
+    .prepare("SELECT * FROM bets WHERE status = 'pending'")
+    .all() as unknown as Bet[];
+
+  let totalRefunded = 0;
+  transaction(() => {
+    for (const bet of pending) {
+      db.prepare(
+        "UPDATE bets SET status = 'cancelled', settled_at = unixepoch() WHERE id = ?"
+      ).run(bet.id);
+      coinService.addCoins(bet.user_id, bet.amount);
+      totalRefunded += bet.amount;
+    }
+    if (pending.length > 0) {
+      db.prepare(
+        "INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES (?, 'cancel_all_bets', NULL, ?)"
+      ).run(adminId, `Cancelled ${pending.length} pending bets, refunded ${totalRefunded} coins total`);
+    }
+  })();
+
+  return { cancelled: pending.length, totalRefunded };
+}
+
 // ─── Manual Settlement ────────────────────────────────────────────────────────
 
 export interface SettleBetResult {

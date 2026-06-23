@@ -23,6 +23,24 @@ const MAX_WAGER_PREMIUM = 5000;
 
 // ─── Balance Operations ───────────────────────────────────────────────────────
 
+export function getAllUserIds(): string[] {
+  const rows = db.prepare("SELECT id FROM users").all() as { id: string }[];
+  return rows.map((r) => r.id);
+}
+
+export function addCoinsToAllUsers(amount: number, adminId: string): number {
+  const ids = getAllUserIds();
+  transaction(() => {
+    db.prepare(
+      "UPDATE users SET coins = coins + ?, lifetime_earned = lifetime_earned + ?"
+    ).run(amount, amount);
+    db.prepare(
+      "INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES (?, 'server_bonus', NULL, ?)"
+    ).run(adminId, `Gave ${amount} coins to all ${ids.length} users`);
+  })();
+  return ids.length;
+}
+
 export function getBalance(userId: string): number {
   ensureUser(userId);
   const row = db.prepare("SELECT coins FROM users WHERE id = ?").get(userId) as
