@@ -20,7 +20,6 @@ import cancelbet from "./admin/cancelbet.js";
 import lockbets from "./admin/lockbets.js";
 import unlockbets from "./admin/unlockbets.js";
 import setupemojis from "./admin/setupemojis.js";
-import serverbonus from "./admin/serverbonus.js";
 
 export const commands: Command[] = [
   // User commands
@@ -39,5 +38,4 @@ export const commands: Command[] = [
   lockbets,
   unlockbets,
   setupemojis,
-  serverbonus,
 ];
