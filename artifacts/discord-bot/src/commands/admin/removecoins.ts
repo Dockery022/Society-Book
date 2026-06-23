@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { Command } from "../../types.js";
 import { removeCoins, getBalance } from "../../services/coinService.js";
-import { requireAdmin } from "../../utils/permissions.js";
+import { requireModerator } from "../../utils/permissions.js";
 import { buildSuccessEmbed } from "../../utils/embeds.js";
 import { formatCoins } from "../../utils/formatters.js";
 import db from "../../database/index.js";
@@ -27,7 +27,7 @@ const command: Command = {
     ),
 
   async execute(interaction) {
-    if (!(await requireAdmin(interaction))) return;
+    if (!(await requireModerator(interaction))) return;
     await interaction.deferReply({ ephemeral: true });
 
     const target = interaction.options.getUser("user", true);

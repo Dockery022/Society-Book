@@ -36,6 +36,21 @@ export function isAdmin(member: GuildMember): boolean {
   );
 }
 
+/**
+ * Check if a member is a moderator or higher.
+ * Includes: server owner, Administrator, Manage Server,
+ * Kick Members, or Ban Members.
+ */
+export function isModerator(member: GuildMember): boolean {
+  if (member.guild.ownerId === member.id) return true;
+  return (
+    member.permissions.has("Administrator") ||
+    member.permissions.has("ManageGuild") ||
+    member.permissions.has("KickMembers") ||
+    member.permissions.has("BanMembers")
+  );
+}
+
 /** Ensure interaction is in a guild — returns member or null */
 export async function requireGuildMember(
   interaction: ChatInputCommandInteraction
@@ -71,6 +86,25 @@ export async function requireAdmin(
     await interaction.reply({
       content:
         "❌ You need **Administrator** or **Manage Server** permission to use this command.",
+      ephemeral: true,
+    });
+    return false;
+  }
+
+  return true;
+}
+
+/** Ensure the user running the command is a moderator or higher */
+export async function requireModerator(
+  interaction: ChatInputCommandInteraction
+): Promise<boolean> {
+  const member = await requireGuildMember(interaction);
+  if (!member) return false;
+
+  if (!isModerator(member)) {
+    await interaction.reply({
+      content:
+        "❌ You need **Kick Members**, **Ban Members**, **Manage Server**, or **Administrator** permission to use this command.",
       ephemeral: true,
     });
     return false;
