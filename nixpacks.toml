@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[phases.install]
+cmds = [
+  "npm install -g pnpm@latest",
+  "pnpm install --frozen-lockfile"
+]
+
+[start]
+cmd = "NODE_OPTIONS=--experimental-sqlite pnpm --filter @workspace/discord-bot run start"
