@@ -1,0 +1,142 @@
+Build a Discord bot called "The Society Book" using Discord.js v14 and Node.js.
+
+The bot will be used in The 1912 Society Discord server and will provide a virtual sports betting system using a custom currency called "1912 Coins."
+
+Requirements:
+
+GENERAL
+
+* Use Discord.js v14
+* Use Node.js
+* Use environment variables for all secrets
+* Store data in a database (SQLite initially, structured so PostgreSQL can be added later)
+* Organize code into folders (commands, events, services, database, utils)
+* Follow GitHub best practices
+* Include a complete README.md
+* Include package.json
+* Include .gitignore
+* Structure the project for easy export to GitHub
+
+COIN SYSTEM
+
+Starting Balance:
+
+* Every user receives 500 coins
+
+Coin Earnings:
+
+* Message Sent = 10 coins
+* Message reward cooldown = 60 seconds
+* Reaction Given = 2 coins
+* Reaction reward cooldown = 30 seconds
+* Reaction Received = 5 coins
+
+Daily Rewards:
+
+* Free Members = 25 coins
+* Premium Members = 100 coins
+
+Coin Restrictions:
+
+* No coin transfers
+* No gifting
+* No trading
+* No sending coins to other users
+
+SPORTSBOOK
+
+Supported Sports:
+
+* NCAA Football
+* NCAA Basketball
+* NFL
+* NBA
+* MLB
+
+Supported Bet Types:
+
+* Moneyline
+* Spread
+* Over/Under
+
+Use The Odds API for odds retrieval.
+
+Commands:
+
+* /coins
+* /daily
+* /leaderboard
+* /bet
+* /mybets
+* /history
+* /game
+
+BETTING
+
+Users can:
+
+* Search for games
+* View available betting markets
+* Place wagers
+* View open wagers
+* View betting history
+
+Bet slips should display:
+
+* Team
+* Market
+* Odds
+* Wager Amount
+* Potential Return
+
+SETTLEMENT
+
+* Automatically settle wagers when games are final
+* Update balances automatically
+* Store all wager history
+
+PREMIUM FEATURES
+
+Premium Members:
+
+* 100 daily coins
+* 5,000 coin maximum wager
+
+Free Members:
+
+* 1,000 coin maximum wager
+
+ADMIN COMMANDS
+
+* /addcoins
+* /removecoins
+* /settlebet
+* /cancelbet
+* /lockbets
+* /unlockbets
+
+LEADERBOARDS
+
+Track:
+
+* Current Balance
+* Lifetime Profit
+* Win Percentage
+* Total Bets
+
+ANTI-ABUSE
+
+* Message cooldown enforcement
+* Reaction cooldown enforcement
+* Alt-account detection framework
+* Coin farming prevention
+* Logging for all administrative actions
+
+GITHUB PREPARATION
+
+* Create a professional folder structure
+* Add comments throughout the code
+* Generate a README explaining setup
+* Include instructions for pushing the project to GitHub
+* Ensure all configuration values are stored in a .env file
+* Make the project production-ready for Railway deployment
