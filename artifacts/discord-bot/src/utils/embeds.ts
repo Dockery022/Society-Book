@@ -70,14 +70,19 @@ export function buildBetSlipEmbed(bet: Bet): EmbedBuilder {
     void:      NEUTRAL_COLOR,
   };
 
+  const awayD    = decorateTeam(bet.away_team, bet.sport);
+  const homeD    = decorateTeam(bet.home_team, bet.sport);
+  const selRaw   = formatBetSelection(bet);
+  const selValue = bet.bet_type === "h2h" ? decorateTeam(selRaw, bet.sport) : selRaw;
+
   const embed = new EmbedBuilder()
     .setColor(colorMap[bet.status] ?? MONEY_GREEN)
     .setTitle(`📋 Bet Slip — #${bet.id}`)
     .addFields(
-      { name: "Matchup",          value: `${bet.home_team} vs ${bet.away_team}`, inline: false },
-      { name: "Sport",            value: formatSport(bet.sport),                  inline: true  },
-      { name: "Market",           value: formatBetType(bet.bet_type),             inline: true  },
-      { name: "Selection",        value: formatBetSelection(bet),                  inline: true  },
+      { name: "Matchup",          value: `${homeD} vs ${awayD}`,    inline: false },
+      { name: "Sport",            value: formatSport(bet.sport),     inline: true  },
+      { name: "Market",           value: formatBetType(bet.bet_type), inline: true  },
+      { name: "Selection",        value: selValue,                   inline: true  },
       { name: "Odds",             value: formatOdds(bet.odds),                    inline: true  },
       { name: "Wager",            value: formatCoins(bet.amount),                 inline: true  },
       { name: "Potential Return", value: formatCoins(bet.potential_return),        inline: true  },
@@ -106,8 +111,9 @@ export function buildBetsListEmbed(bets: Bet[], username: string, title: string)
     .setTimestamp();
 
   for (const bet of bets.slice(0, 10)) {
-    const matchup   = `${bet.home_team} vs ${bet.away_team}`;
-    const selection = formatBetSelection(bet);
+    const matchup   = `${decorateTeam(bet.home_team, bet.sport)} vs ${decorateTeam(bet.away_team, bet.sport)}`;
+    const selRaw    = formatBetSelection(bet);
+    const selection = bet.bet_type === "h2h" ? decorateTeam(selRaw, bet.sport) : selRaw;
     embed.addFields({
       name: `#${bet.id} — ${formatBetStatus(bet.status)}`,
       value: [
@@ -141,7 +147,7 @@ export function buildHistoryEmbed(bets: Bet[], username: string): EmbedBuilder {
     .setTimestamp();
 
   for (const bet of bets.slice(0, 10)) {
-    const matchup = `${bet.home_team} vs ${bet.away_team}`;
+    const matchup = `${decorateTeam(bet.home_team, bet.sport)} vs ${decorateTeam(bet.away_team, bet.sport)}`;
     const pl      = calcProfitLoss(bet);
     embed.addFields({
       name: `#${bet.id} — ${formatBetStatus(bet.status)}`,
