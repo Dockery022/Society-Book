@@ -24,6 +24,7 @@ import {
 import { getMarket, getBestBookmaker } from "../services/oddsService.js";
 import { withFlag } from "./countryFlags.js";
 import { withTeamEmoji } from "./teamEmojis.js";
+import { getEmoji } from "./emojiCache.js";
 
 const MONEY_GREEN = 0x2ecc71; // Money green — used for all embeds
 const WIN_COLOR   = 0x2ecc71;
@@ -252,7 +253,17 @@ export function buildGameEmbed(game: OddsApiGame): EmbedBuilder {
     });
   }
 
-  embed.addFields({ name: "\u200b", value: `Via **${bm.title}**`, inline: false });
+  const BOOKMAKER_EMOJI_NAMES: Record<string, string> = {
+    draftkings: "DK",
+    fanduel: "FD",
+    betmgm: "BetMGM",
+    pointsbet: "PointsBet",
+    bovada: "Bovada",
+  };
+  const emojiName = BOOKMAKER_EMOJI_NAMES[bm.key] ?? bm.key;
+  const bmEmoji = getEmoji(emojiName, "");
+  const bmLabel = bmEmoji ? `${bmEmoji} **${bm.title}**` : `**${bm.title}**`;
+  embed.addFields({ name: "\u200b", value: `Via ${bmLabel}`, inline: false });
   return embed;
 }
 

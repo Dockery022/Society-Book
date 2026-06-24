@@ -2,6 +2,7 @@ import { Events, ActivityType, PermissionFlagsBits, Routes } from "discord.js";
 import type { BotClient, BotEvent } from "../types.js";
 import { startSettlementScheduler } from "../services/settlementService.js";
 import { commands } from "../commands/index.js";
+import { setEmoji } from "../utils/emojiCache.js";
 
 /** Register slash commands with Discord on startup */
 async function registerCommands(client: BotClient): Promise<void> {
@@ -77,6 +78,15 @@ const readyEvent: BotEvent = {
 
     await registerCommands(client);
     await clearChannelRestrictions(client);
+
+    // Cache custom guild emojis so embed builders can use them by name
+    for (const [, guild] of client.guilds.cache) {
+      const emojis = await guild.emojis.fetch();
+      for (const [, emoji] of emojis) {
+        if (emoji.name) setEmoji(emoji.name, `<:${emoji.name}:${emoji.id}>`);
+      }
+    }
+    console.log("[Bot] Custom emoji cache populated.");
 
     startSettlementScheduler();
     console.log("[Bot] Ready — The Society Book is open for business.");
