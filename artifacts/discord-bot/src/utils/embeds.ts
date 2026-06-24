@@ -73,7 +73,7 @@ export function buildBetSlipEmbed(bet: Bet): EmbedBuilder {
   const awayD    = decorateTeam(bet.away_team, bet.sport);
   const homeD    = decorateTeam(bet.home_team, bet.sport);
   const selRaw   = formatBetSelection(bet);
-  const selValue = bet.bet_type === "h2h" ? decorateTeam(selRaw, bet.sport) : selRaw;
+  const selValue = bet.bet_type === "moneyline" ? decorateTeam(selRaw, bet.sport) : selRaw;
 
   const embed = new EmbedBuilder()
     .setColor(colorMap[bet.status] ?? MONEY_GREEN)
@@ -113,7 +113,7 @@ export function buildBetsListEmbed(bets: Bet[], username: string, title: string)
   for (const bet of bets.slice(0, 10)) {
     const matchup   = `${decorateTeam(bet.home_team, bet.sport)} vs ${decorateTeam(bet.away_team, bet.sport)}`;
     const selRaw    = formatBetSelection(bet);
-    const selection = bet.bet_type === "h2h" ? decorateTeam(selRaw, bet.sport) : selRaw;
+    const selection = bet.bet_type === "moneyline" ? decorateTeam(selRaw, bet.sport) : selRaw;
     embed.addFields({
       name: `#${bet.id} — ${formatBetStatus(bet.status)}`,
       value: [
