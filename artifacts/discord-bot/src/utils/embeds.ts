@@ -23,6 +23,7 @@ import {
 } from "./formatters.js";
 import { getMarket, getBestBookmaker } from "../services/oddsService.js";
 import { withFlag } from "./countryFlags.js";
+import { withTeamEmoji } from "./teamEmojis.js";
 
 const MONEY_GREEN = 0x2ecc71; // Money green — used for all embeds
 const WIN_COLOR   = 0x2ecc71;
@@ -192,13 +193,20 @@ export function buildLeaderboardEmbed(
 
 // ─── Game Odds Embed ──────────────────────────────────────────────────────────
 
+function decorateTeam(teamName: string, sportKey: string): string {
+  if (sportKey.startsWith("soccer_")) return withFlag(teamName);
+  return withTeamEmoji(teamName);
+}
+
 export function buildGameEmbed(game: OddsApiGame): EmbedBuilder {
-  const commence = isoToUnix(game.commence_time);
-  const bm       = getBestBookmaker(game);
+  const commence  = isoToUnix(game.commence_time);
+  const bm        = getBestBookmaker(game);
+  const awayLabel = decorateTeam(game.away_team, game.sport_key);
+  const homeLabel = decorateTeam(game.home_team, game.sport_key);
 
   const embed = new EmbedBuilder()
     .setColor(MONEY_GREEN)
-    .setTitle(`🎰 ${game.away_team} @ ${game.home_team}`)
+    .setTitle(`🎰 ${awayLabel} @ ${homeLabel}`)
     .setDescription(
       `**${formatSport(game.sport_key)}** · ${formatDateTime(commence)} (${formatRelativeTime(commence)})`
     )
@@ -216,7 +224,7 @@ export function buildGameEmbed(game: OddsApiGame): EmbedBuilder {
     const home = h2h.outcomes.find((o) => o.name === game.home_team);
     embed.addFields({
       name: "💵 Moneyline",
-      value: `${game.away_team}: **${formatOdds(away?.price ?? 0)}**\n${game.home_team}: **${formatOdds(home?.price ?? 0)}**`,
+      value: `${awayLabel}: **${formatOdds(away?.price ?? 0)}**\n${homeLabel}: **${formatOdds(home?.price ?? 0)}**`,
       inline: true,
     });
   }
@@ -229,7 +237,7 @@ export function buildGameEmbed(game: OddsApiGame): EmbedBuilder {
     const homePts = home?.point ?? 0;
     embed.addFields({
       name: "📊 Spread",
-      value: `${game.away_team}: **${awayPts > 0 ? "+" : ""}${awayPts}** (${formatOdds(away?.price ?? 0)})\n${game.home_team}: **${homePts > 0 ? "+" : ""}${homePts}** (${formatOdds(home?.price ?? 0)})`,
+      value: `${awayLabel}: **${awayPts > 0 ? "+" : ""}${awayPts}** (${formatOdds(away?.price ?? 0)})\n${homeLabel}: **${homePts > 0 ? "+" : ""}${homePts}** (${formatOdds(home?.price ?? 0)})`,
       inline: true,
     });
   }
