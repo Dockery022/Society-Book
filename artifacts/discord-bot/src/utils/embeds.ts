@@ -195,7 +195,7 @@ export function buildLeaderboardEmbed(
 
 function decorateTeam(teamName: string, sportKey: string): string {
   if (sportKey.startsWith("soccer_")) return withFlag(teamName);
-  return withTeamEmoji(teamName);
+  return teamName;
 }
 
 export function buildGameEmbed(game: OddsApiGame): EmbedBuilder {
