@@ -22,6 +22,7 @@ import {
   calcProfitLoss,
 } from "./formatters.js";
 import { getMarket, getBestBookmaker } from "../services/oddsService.js";
+import { withFlag } from "./countryFlags.js";
 
 const MONEY_GREEN = 0x2ecc71; // Money green — used for all embeds
 const WIN_COLOR   = 0x2ecc71;
