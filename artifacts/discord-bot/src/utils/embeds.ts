@@ -28,6 +28,9 @@ const WIN_COLOR   = 0x2ecc71;
 const LOSS_COLOR  = 0xe74c3c;
 const NEUTRAL_COLOR = 0x95a5a6;
 
+const FOOTER_TEXT = "The 1912 Society Book • Odds provided by The Odds API";
+const FOOTER_ICON = "https://the-odds-api.com/assets/img/the-odds-api-logo.png";
+
 // ─── Balance Embed ────────────────────────────────────────────────────────────
 
 export function buildBalanceEmbed(user: User, username: string): EmbedBuilder {
@@ -50,7 +53,7 @@ export function buildBalanceEmbed(user: User, username: string): EmbedBuilder {
         inline: true,
       }
     )
-    .setFooter({ text: "The 1912 Society Book" })
+    .setFooter({ text: FOOTER_TEXT, iconURL: FOOTER_ICON })
     .setTimestamp();
 }
 
@@ -79,7 +82,7 @@ export function buildBetSlipEmbed(bet: Bet): EmbedBuilder {
       { name: "Status",           value: formatBetStatus(bet.status),             inline: true  },
       { name: "Game Time",        value: formatDateTime(bet.commence_time),       inline: true  },
     )
-    .setFooter({ text: "The 1912 Society Book" })
+    .setFooter({ text: FOOTER_TEXT, iconURL: FOOTER_ICON })
     .setTimestamp(bet.created_at * 1000);
 
   if (bet.status === "won") {
@@ -97,7 +100,7 @@ export function buildBetsListEmbed(bets: Bet[], username: string, title: string)
     .setColor(MONEY_GREEN)
     .setTitle(title)
     .setDescription(bets.length === 0 ? "No bets found." : null)
-    .setFooter({ text: `${username} • The 1912 Society Book` })
+    .setFooter({ text: `${username} • ${FOOTER_TEXT}`, iconURL: FOOTER_ICON })
     .setTimestamp();
 
   for (const bet of bets.slice(0, 10)) {
@@ -132,7 +135,7 @@ export function buildHistoryEmbed(bets: Bet[], username: string): EmbedBuilder {
         ? "No settled bets yet."
         : `Net P&L: **${totalProfit >= 0 ? "+" : ""}${formatCoins(totalProfit)}**`
     )
-    .setFooter({ text: `${username} • The 1912 Society Book` })
+    .setFooter({ text: `${username} • ${FOOTER_TEXT}`, iconURL: FOOTER_ICON })
     .setTimestamp();
 
   for (const bet of bets.slice(0, 10)) {
@@ -164,7 +167,7 @@ export function buildLeaderboardEmbed(
   const embed = new EmbedBuilder()
     .setColor(MONEY_GREEN)
     .setTitle("🏆 The Society Book — Leaderboard")
-    .setFooter({ text: "The 1912 Society Book" })
+    .setFooter({ text: FOOTER_TEXT, iconURL: FOOTER_ICON })
     .setTimestamp();
 
   if (entries.length === 0) {
@@ -198,7 +201,7 @@ export function buildGameEmbed(game: OddsApiGame): EmbedBuilder {
     .setDescription(
       `**${formatSport(game.sport_key)}** · ${formatDateTime(commence)} (${formatRelativeTime(commence)})`
     )
-    .setFooter({ text: "The 1912 Society Book" })
+    .setFooter({ text: FOOTER_TEXT, iconURL: FOOTER_ICON })
     .setTimestamp();
 
   if (!bm) {
@@ -252,7 +255,7 @@ export function buildErrorEmbed(message: string): EmbedBuilder {
     .setColor(LOSS_COLOR)
     .setTitle("❌ Error")
     .setDescription(message)
-    .setFooter({ text: "The 1912 Society Book" });
+    .setFooter({ text: FOOTER_TEXT, iconURL: FOOTER_ICON });
 }
 
 // ─── Success Embed ────────────────────────────────────────────────────────────
@@ -262,5 +265,5 @@ export function buildSuccessEmbed(title: string, message: string): EmbedBuilder 
     .setColor(MONEY_GREEN)
     .setTitle(`✅ ${title}`)
     .setDescription(message)
-    .setFooter({ text: "The 1912 Society Book" });
+    .setFooter({ text: FOOTER_TEXT, iconURL: FOOTER_ICON });
 }
