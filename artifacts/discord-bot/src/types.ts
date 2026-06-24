@@ -154,6 +154,7 @@ export const SUPPORTED_SPORTS: Record<string, string> = {
   basketball_nba: "NBA",
   basketball_ncaab: "NCAA Basketball",
   baseball_mlb: "MLB",
+  soccer_fifa_world_cup: "FIFA World Cup",
 };
 
 export const SPORT_EMOJIS: Record<string, string> = {
@@ -162,4 +163,5 @@ export const SPORT_EMOJIS: Record<string, string> = {
   basketball_nba: "🏀",
   basketball_ncaab: "🏀",
   baseball_mlb: "⚾",
+  soccer_fifa_world_cup: "⚽",
 };
