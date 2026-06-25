@@ -57,7 +57,7 @@
   "Columbia": { primary: "#004B85", logoPath: L("columbia.png") },
   "Connecticut": { primary: "#0A1D5A", logoPath: L("connecticut.png") },
   "UConn": { primary: "#888888", logoPath: L("connecticut.png") },
-  "Coppin State": { primary: "#FFF500", logoPath: L("coppinState.png") },
+  "Coppin State": { primary: "#FFF500", logoPath: L("coppinState.svg") },
   "Cornell": { primary: "#D60027", logoPath: L("cornell.png") },
   "Delaware": { primary: "#FFDD00", logoPath: L("delaware.png") },
   "Delaware State": { primary: "#01A9EF", logoPath: L("delawareState.png") },
@@ -270,7 +270,7 @@
   "IUPUI": { primary: "#A81F30", logoPath: L("iupui.png") },
   "Loyola-Chicago": { primary: "#888888", logoPath: L("loyolaChicago.png") },
   "Drake": { primary: "#0053A0", logoPath: L("drake.png") },
-  "Bradley": { primary: "#FF151A", logoPath: L("bradley.png") },
+  "Bradley": { primary: "#FF151A", logoPath: L("bradley.svg") },
   "Evansville": { primary: "#FF6B0F", logoPath: L("evansville.png") },
   "Belmont": { primary: "#E82645", logoPath: L("belmont.png") },
   };
