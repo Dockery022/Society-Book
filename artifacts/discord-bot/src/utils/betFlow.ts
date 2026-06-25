@@ -25,6 +25,8 @@ import { getBalance, getMaxWager } from "../services/coinService.js";
 import { isPremium, requireGuildMember } from "../utils/permissions.js";
 import { buildBetSlipEmbed, buildErrorEmbed } from "../utils/embeds.js";
 import { isoToUnix, formatCoins, formatDateTime } from "../utils/formatters.js";
+import { generateMatchupImage } from "../utils/matchupImageGenerator.js";
+import { AttachmentBuilder } from "discord.js";
 
 const TIMEOUT_MS = 180_000;
 
@@ -225,5 +227,14 @@ export async function showAmountModal(
     ? (originalInteraction.member as import("discord.js").GuildMember).displayName
     : originalInteraction.user.username;
   slipEmbed.setTitle(`✅ Bet placed by ${username}`);
-  await originalInteraction.editReply({ embeds: [slipEmbed], components: [] });
+
+  // Generate matchup image — attach if successful, fall back gracefully
+  try {
+    const imgBuffer = await generateMatchupImage(game.away_team, game.home_team);
+    const attachment = new AttachmentBuilder(imgBuffer, { name: "matchup.png" });
+    slipEmbed.setImage("attachment://matchup.png");
+    await originalInteraction.editReply({ embeds: [slipEmbed], components: [], files: [attachment] });
+  } catch {
+    await originalInteraction.editReply({ embeds: [slipEmbed], components: [] });
+  }
 }
