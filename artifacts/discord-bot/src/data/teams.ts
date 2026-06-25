@@ -214,6 +214,24 @@ const TEAM_DB: Record<string, TeamData> = {
 
 const DEFAULT: TeamData = { primary: "#1a1a2e" };
 
+/**
+ * Resolve a team name to its branding data.
+ *
+ * The Odds API returns names like "Virginia Cavaliers" or "NC State Wolfpack"
+ * (school + mascot) while our NCAA keys are school-name-only ("Virginia",
+ * "NC State").  We try progressively shorter prefixes so both formats work.
+ */
 export function getTeamData(teamName: string): TeamData {
-  return TEAM_DB[teamName] ?? DEFAULT;
+  // 1. Exact match (covers NFL/NBA/MLB/WNBA/Soccer and any NCAA alias)
+  if (TEAM_DB[teamName]) return TEAM_DB[teamName];
+
+  // 2. Strip trailing words one at a time ("Virginia Cavaliers" → "Virginia")
+  const words = teamName.split(" ");
+  for (let i = words.length - 1; i >= 1; i--) {
+    const shorter = words.slice(0, i).join(" ");
+    if (TEAM_DB[shorter]) return TEAM_DB[shorter];
+  }
+
+  // 3. No match — return dark default so the image still renders
+  return DEFAULT;
 }
