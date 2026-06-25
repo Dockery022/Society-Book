@@ -229,7 +229,7 @@ export async function showAmountModal(
   slipEmbed.setTitle(`✅ Bet placed by ${username}`);
 
   try {
-    const imgBuffer = await generateMatchupImage(game.away_team, game.home_team);
+    const imgBuffer = await generateMatchupImage(game.away_team, game.home_team, sportKey);
     const attachment = new AttachmentBuilder(imgBuffer, { name: "matchup.png" });
     slipEmbed.setImage("attachment://matchup.png");
     await originalInteraction.editReply({ embeds: [slipEmbed], components: [], files: [attachment] });

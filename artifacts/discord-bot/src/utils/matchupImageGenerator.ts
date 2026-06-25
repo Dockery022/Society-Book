@@ -58,10 +58,11 @@ function splitX(y: number): number {
 
 export async function generateMatchupImage(
   awayTeam: string,
-  homeTeam: string
+  homeTeam: string,
+  sportKey?: string
 ): Promise<Buffer> {
-  const away = getTeamData(awayTeam);
-  const home = getTeamData(homeTeam);
+  const away = getTeamData(awayTeam, sportKey);
+  const home = getTeamData(homeTeam, sportKey);
 
   // Fetch logos in parallel — don't block if one fails
   const [awayLogo, homeLogo] = await Promise.all([

@@ -3,7 +3,11 @@
  * Logo URLs use ESPN's public CDN for US sports; flagcdn.com for soccer.
  * logoPath is an absolute filesystem path for locally bundled NCAA logos.
  */
+import path from "path";
+import { fileURLToPath } from "url";
 import { NCAA } from "./ncaaTeams.js";
+
+const LOGOS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../assets/logos");
 
 export interface TeamData {
   primary: string;
@@ -215,23 +219,49 @@ const TEAM_DB: Record<string, TeamData> = {
 const DEFAULT: TeamData = { primary: "#1a1a2e" };
 
 /**
+ * Sport-specific logo overrides.
+ * Key format: "<TeamName>|<sportKey>" e.g. "Louisville|americanfootball_ncaaf"
+ * Wins over the generic NCAA entry when sport is known.
+ */
+const SPORT_OVERRIDES: Record<string, Partial<TeamData>> = {
+  "Louisville|americanfootball_ncaaf": { logoPath: path.join(LOGOS_DIR, "louisvilleFootball.png") },
+};
+
+/**
  * Resolve a team name to its branding data.
  *
  * The Odds API returns names like "Virginia Cavaliers" or "NC State Wolfpack"
  * (school + mascot) while our NCAA keys are school-name-only ("Virginia",
  * "NC State").  We try progressively shorter prefixes so both formats work.
+ *
+ * Pass sportKey (e.g. "americanfootball_ncaaf") to get sport-specific logos.
  */
-export function getTeamData(teamName: string): TeamData {
+export function getTeamData(teamName: string, sportKey?: string): TeamData {
   // 1. Exact match (covers NFL/NBA/MLB/WNBA/Soccer and any NCAA alias)
-  if (TEAM_DB[teamName]) return TEAM_DB[teamName];
+  const base = TEAM_DB[teamName] ?? (() => {
+    // Strip trailing words one at a time ("Virginia Cavaliers" → "Virginia")
+    const words = teamName.split(" ");
+    for (let i = words.length - 1; i >= 1; i--) {
+      const shorter = words.slice(0, i).join(" ");
+      if (TEAM_DB[shorter]) return TEAM_DB[shorter];
+    }
+    return DEFAULT;
+  })();
 
-  // 2. Strip trailing words one at a time ("Virginia Cavaliers" → "Virginia")
-  const words = teamName.split(" ");
-  for (let i = words.length - 1; i >= 1; i--) {
-    const shorter = words.slice(0, i).join(" ");
-    if (TEAM_DB[shorter]) return TEAM_DB[shorter];
+  // 2. Apply sport-specific logo override if available
+  if (sportKey) {
+    const overrideKey = `${teamName}|${sportKey}`;
+    const override = SPORT_OVERRIDES[overrideKey];
+    if (override) return { ...base, ...override };
+
+    // Also try stripped name (handles "Louisville Cardinals|americanfootball_ncaaf")
+    const words = teamName.split(" ");
+    for (let i = words.length - 1; i >= 1; i--) {
+      const shorter = words.slice(0, i).join(" ");
+      const shorterKey = `${shorter}|${sportKey}`;
+      if (SPORT_OVERRIDES[shorterKey]) return { ...base, ...SPORT_OVERRIDES[shorterKey] };
+    }
   }
 
-  // 3. No match — return dark default so the image still renders
-  return DEFAULT;
+  return base;
 }
