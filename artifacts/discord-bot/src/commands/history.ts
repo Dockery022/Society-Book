@@ -19,8 +19,8 @@ const command: Command = {
   async execute(interaction) {
     await interaction.deferReply();
 
-    const limit = interaction.options.getInteger("limit") ?? 10;
-    const bets = getUserBets(interaction.user.id, undefined, limit);
+    const limit  = interaction.options.getInteger("limit") ?? 10;
+    const bets   = await getUserBets(interaction.user.id, undefined, limit);
     const settled = bets.filter(
       (b) => b.status === "won" || b.status === "lost" || b.status === "void"
     );

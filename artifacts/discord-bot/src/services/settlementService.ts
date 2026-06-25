@@ -5,10 +5,11 @@
 
 import cron from "node-cron";
 import axios from "axios";
-import db, { transaction } from "../database/index.js";
-import * as coinService from "./coinService.js";
+import { query, withTransaction } from "../database/index.js";
 import type { Bet } from "../types.js";
 import { SUPPORTED_SPORTS } from "../types.js";
+
+const NOW_SQL = "EXTRACT(EPOCH FROM NOW())::BIGINT";
 
 function getApiKey(): string {
   const key = process.env.ODDS_API_KEY;
@@ -76,43 +77,48 @@ function determineBetOutcome(
   return "lost";
 }
 
-export function settleGameBets(
+export async function settleGameBets(
   gameId: string,
   homeScore: number,
   awayScore: number
-): { settled: number; paid: number } {
-  const pendingBets = db
-    .prepare("SELECT * FROM bets WHERE game_id = ? AND status = 'pending'")
-    .all(gameId) as unknown as Bet[];
+): Promise<{ settled: number; paid: number }> {
+  const pendingBets = (await query<Bet>(
+    "SELECT * FROM bets WHERE game_id = $1 AND status = 'pending'",
+    [gameId]
+  )) as unknown as Bet[];
 
   let settled = 0;
   let paid = 0;
 
-  transaction(() => {
+  await withTransaction(async (q) => {
     for (const bet of pendingBets) {
       const outcome = determineBetOutcome(bet, homeScore, awayScore);
       const finalStatus = outcome === "push" ? "void" : outcome;
 
-      db.prepare(
-        "UPDATE bets SET status = ?, settled_at = unixepoch() WHERE id = ?"
-      ).run(finalStatus, bet.id);
+      await q(`UPDATE bets SET status = $1, settled_at = ${NOW_SQL} WHERE id = $2`, [finalStatus, bet.id]);
 
       if (outcome === "won") {
-        coinService.addCoins(bet.user_id, bet.potential_return);
-        coinService.recordBetWin(bet.user_id, bet.potential_return - bet.amount);
-        paid += bet.potential_return;
+        await q(
+          "UPDATE users SET coins = coins + $1, lifetime_earned = lifetime_earned + $1, total_wins = total_wins + 1 WHERE id = $2",
+          [bet.potential_return, bet.user_id]
+        );
+        paid += Number(bet.potential_return);
       } else if (outcome === "push") {
-        coinService.addCoins(bet.user_id, bet.amount);
-        paid += bet.amount;
+        await q(
+          "UPDATE users SET coins = coins + $1, lifetime_earned = lifetime_earned + $1 WHERE id = $2",
+          [bet.amount, bet.user_id]
+        );
+        paid += Number(bet.amount);
       }
 
       settled++;
     }
 
-    db.prepare(
-      "UPDATE games SET completed = 1, home_score = ?, away_score = ?, last_updated = unixepoch() WHERE id = ?"
-    ).run(homeScore, awayScore, gameId);
-  })();
+    await q(
+      `UPDATE games SET completed = 1, home_score = $1, away_score = $2, last_updated = ${NOW_SQL} WHERE id = $3`,
+      [homeScore, awayScore, gameId]
+    );
+  });
 
   return { settled, paid };
 }
@@ -121,9 +127,9 @@ export function startSettlementScheduler(): void {
   cron.schedule("*/15 * * * *", async () => {
     console.log("[Settlement] Checking for completed games…");
 
-    const pendingGames = db
-      .prepare("SELECT DISTINCT game_id, sport FROM bets WHERE status = 'pending'")
-      .all() as unknown as { game_id: string; sport: string }[];
+    const pendingGames = await query<{ game_id: string; sport: string }>(
+      "SELECT DISTINCT game_id, sport FROM bets WHERE status = 'pending'"
+    );
 
     if (pendingGames.length === 0) return;
 
@@ -147,7 +153,7 @@ export function startSettlementScheduler(): void {
           score.scores.find((s) => s.name === score.away_team)?.score ?? "0"
         );
 
-        const { settled, paid } = settleGameBets(score.id, homeScore, awayScore);
+        const { settled, paid } = await settleGameBets(score.id, homeScore, awayScore);
         if (settled > 0) {
           console.log(
             `[Settlement] ${score.home_team} vs ${score.away_team}: ${settled} bets settled, ${paid} coins paid out`

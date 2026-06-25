@@ -1,10 +1,4 @@
-import {
-  SlashCommandBuilder,
-  StringSelectMenuBuilder,
-  StringSelectMenuOptionBuilder,
-  ActionRowBuilder,
-  ComponentType,
-} from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types.js";
 import { getUserBets } from "../services/bettingService.js";
 import { buildBetsListEmbed } from "../utils/embeds.js";
@@ -19,9 +13,9 @@ const command: Command = {
         .setDescription("Filter by bet status (default: pending)")
         .setRequired(false)
         .addChoices(
-          { name: "⏳ Pending", value: "pending" },
-          { name: "✅ Won", value: "won" },
-          { name: "❌ Lost", value: "lost" },
+          { name: "⏳ Pending",   value: "pending"   },
+          { name: "✅ Won",       value: "won"       },
+          { name: "❌ Lost",      value: "lost"      },
           { name: "🚫 Cancelled", value: "cancelled" }
         )
     ),
@@ -30,12 +24,12 @@ const command: Command = {
     await interaction.deferReply({ ephemeral: false });
 
     const status = interaction.options.getString("status") ?? "pending";
-    const bets = getUserBets(interaction.user.id, status, 10);
+    const bets   = await getUserBets(interaction.user.id, status, 10);
 
     const statusLabels: Record<string, string> = {
-      pending: "⏳ Open Bets",
-      won: "✅ Winning Bets",
-      lost: "❌ Lost Bets",
+      pending:   "⏳ Open Bets",
+      won:       "✅ Winning Bets",
+      lost:      "❌ Lost Bets",
       cancelled: "🚫 Cancelled Bets",
     };
 

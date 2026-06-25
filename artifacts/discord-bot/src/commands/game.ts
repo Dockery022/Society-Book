@@ -319,7 +319,7 @@ const command: Command = {
 
       // ── Market select → bet flow ────────────────────────────────────────────
       if (ci.customId === "game_market") {
-        if (areBetsLocked()) {
+        if (await areBetsLocked()) {
           await ci.update({
             embeds: [buildErrorEmbed("🔒 Betting is currently **locked** by an admin.")],
             components: [],

@@ -10,8 +10,7 @@ const command: Command = {
 
   async execute(interaction) {
     await interaction.deferReply();
-
-    const user = getUser(interaction.user.id);
+    const user = await getUser(interaction.user.id);
     const embed = buildBalanceEmbed(user, interaction.user.username);
     await interaction.editReply({ embeds: [embed] });
   },

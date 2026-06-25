@@ -3,24 +3,27 @@
  * Handles bet placement, retrieval, cancellation, and lock state.
  */
 
-import db, { ensureUser, transaction } from "../database/index.js";
-import * as coinService from "./coinService.js";
+import { query, queryOne, execute, ensureUser, withTransaction } from "../database/index.js";
 import { calcPotentialReturn } from "./oddsService.js";
 import type { Bet, BetSlip } from "../types.js";
 
+const NOW_SQL = "EXTRACT(EPOCH FROM NOW())::BIGINT";
+
 // ─── Lock State ───────────────────────────────────────────────────────────────
 
-export function areBetsLocked(): boolean {
-  const row = db
-    .prepare("SELECT value FROM bot_settings WHERE key = ?")
-    .get("bets_locked") as { value: string } | undefined;
+export async function areBetsLocked(): Promise<boolean> {
+  const row = await queryOne<{ value: string }>(
+    "SELECT value FROM bot_settings WHERE key = 'bets_locked'"
+  );
   return row?.value === "true";
 }
 
-export function setBetsLocked(locked: boolean): void {
-  db.prepare(
-    "INSERT INTO bot_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
-  ).run("bets_locked", locked ? "true" : "false");
+export async function setBetsLocked(locked: boolean): Promise<void> {
+  await execute(
+    `INSERT INTO bot_settings (key, value) VALUES ('bets_locked', $1)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [locked ? "true" : "false"]
+  );
 }
 
 // ─── Place Bet ────────────────────────────────────────────────────────────────
@@ -31,13 +34,14 @@ export interface PlaceBetResult {
   bet?: Bet;
 }
 
-export function placeBet(userId: string, slip: BetSlip): PlaceBetResult {
-  if (areBetsLocked()) {
+export async function placeBet(userId: string, slip: BetSlip): Promise<PlaceBetResult> {
+  if (await areBetsLocked()) {
     return { success: false, error: "Betting is currently locked by an admin." };
   }
 
-  ensureUser(userId);
-  const balance = coinService.getBalance(userId);
+  await ensureUser(userId);
+  const balRow = await queryOne<{ coins: number }>("SELECT coins FROM users WHERE id = $1", [userId]);
+  const balance = balRow?.coins ?? 0;
 
   if (slip.amount <= 0) {
     return { success: false, error: "Wager amount must be at least 1 coin." };
@@ -45,24 +49,27 @@ export function placeBet(userId: string, slip: BetSlip): PlaceBetResult {
   if (slip.amount > balance) {
     return {
       success: false,
-      error: `Insufficient coins. You have **${balance.toLocaleString()}** coins but tried to wager **${slip.amount.toLocaleString()}**.`,
+      error: `Insufficient coins. You have **${Number(balance).toLocaleString()}** coins but tried to wager **${slip.amount.toLocaleString()}**.`,
     };
   }
 
   const potentialReturn = calcPotentialReturn(slip.odds, slip.amount);
   let betId = 0;
 
-  transaction(() => {
-    coinService.removeCoins(userId, slip.amount);
-    coinService.recordBetPlace(userId);
+  await withTransaction(async (q) => {
+    await q(
+      "UPDATE users SET coins = GREATEST(0, coins - $1), lifetime_lost = lifetime_lost + $1 WHERE id = $2",
+      [slip.amount, userId]
+    );
+    await q("UPDATE users SET total_bets = total_bets + 1 WHERE id = $1", [userId]);
 
-    const result = db
-      .prepare(
-        `INSERT INTO bets (user_id, game_id, sport, bet_type, team, line, odds, amount,
+    const rows = await q<{ id: number }>(
+      `INSERT INTO bets
+         (user_id, game_id, sport, bet_type, team, line, odds, amount,
           potential_return, status, home_team, away_team, commence_time)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
-      )
-      .run(
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', $10, $11, $12)
+       RETURNING id`,
+      [
         userId,
         slip.gameId,
         slip.sport,
@@ -74,49 +81,49 @@ export function placeBet(userId: string, slip: BetSlip): PlaceBetResult {
         potentialReturn,
         slip.homeTeam,
         slip.awayTeam,
-        slip.commenceTime
-      );
+        slip.commenceTime,
+      ]
+    );
+    betId = Number(rows[0]!.id);
 
-    betId = Number(result.lastInsertRowid);
+    await q(
+      `INSERT INTO games (id, sport, home_team, away_team, commence_time)
+       VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING`,
+      [slip.gameId, slip.sport, slip.homeTeam, slip.awayTeam, slip.commenceTime]
+    );
+  });
 
-    db.prepare(
-      "INSERT OR IGNORE INTO games (id, sport, home_team, away_team, commence_time) VALUES (?, ?, ?, ?, ?)"
-    ).run(slip.gameId, slip.sport, slip.homeTeam, slip.awayTeam, slip.commenceTime);
-  })();
-
-  const bet = db
-    .prepare("SELECT * FROM bets WHERE id = ?")
-    .get(betId) as unknown as Bet;
-  return { success: true, bet };
+  const bet = await queryOne<Bet>("SELECT * FROM bets WHERE id = $1", [betId]);
+  return { success: true, bet: bet as unknown as Bet };
 }
 
 // ─── Get Bets ─────────────────────────────────────────────────────────────────
 
-export function getUserBets(userId: string, status?: string, limit = 10): Bet[] {
+export async function getUserBets(userId: string, status?: string, limit = 10): Promise<Bet[]> {
   if (status) {
-    return db
-      .prepare(
-        "SELECT * FROM bets WHERE user_id = ? AND status = ? ORDER BY created_at DESC LIMIT ?"
-      )
-      .all(userId, status, limit) as unknown as Bet[];
+    return query<Bet>(
+      "SELECT * FROM bets WHERE user_id = $1 AND status = $2 ORDER BY created_at DESC LIMIT $3",
+      [userId, status, limit]
+    ) as unknown as Promise<Bet[]>;
   }
-  return db
-    .prepare("SELECT * FROM bets WHERE user_id = ? ORDER BY created_at DESC LIMIT ?")
-    .all(userId, limit) as unknown as Bet[];
+  return query<Bet>(
+    "SELECT * FROM bets WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2",
+    [userId, limit]
+  ) as unknown as Promise<Bet[]>;
 }
 
-export function getBetById(betId: number): Bet | null {
-  return (
-    (db
-      .prepare("SELECT * FROM bets WHERE id = ?")
-      .get(betId) as unknown as Bet | undefined) ?? null
-  );
+export async function getBetById(betId: number): Promise<Bet | null> {
+  return queryOne<Bet>(
+    "SELECT * FROM bets WHERE id = $1",
+    [betId]
+  ) as unknown as Promise<Bet | null>;
 }
 
-export function getPendingBetsForGame(gameId: string): Bet[] {
-  return db
-    .prepare("SELECT * FROM bets WHERE game_id = ? AND status = 'pending'")
-    .all(gameId) as unknown as Bet[];
+export async function getPendingBetsForGame(gameId: string): Promise<Bet[]> {
+  return query<Bet>(
+    "SELECT * FROM bets WHERE game_id = $1 AND status = 'pending'",
+    [gameId]
+  ) as unknown as Promise<Bet[]>;
 }
 
 // ─── Cancel Bet ───────────────────────────────────────────────────────────────
@@ -127,27 +134,31 @@ export interface CancelBetResult {
   refunded?: number;
 }
 
-export function cancelBet(betId: number, adminId?: string): CancelBetResult {
-  const bet = getBetById(betId);
+export async function cancelBet(betId: number, adminId?: string): Promise<CancelBetResult> {
+  const bet = await getBetById(betId);
   if (!bet) return { success: false, error: `Bet #${betId} not found.` };
   if (bet.status !== "pending") {
     return { success: false, error: `Bet #${betId} is already **${bet.status}**.` };
   }
 
-  transaction(() => {
-    db.prepare(
-      "UPDATE bets SET status = 'cancelled', settled_at = unixepoch() WHERE id = ?"
-    ).run(betId);
-    coinService.addCoins(bet.user_id, bet.amount);
-
+  await withTransaction(async (q) => {
+    await q(
+      `UPDATE bets SET status = 'cancelled', settled_at = ${NOW_SQL} WHERE id = $1`,
+      [betId]
+    );
+    await q(
+      "UPDATE users SET coins = coins + $1, lifetime_earned = lifetime_earned + $1 WHERE id = $2",
+      [bet.amount, bet.user_id]
+    );
     if (adminId) {
-      db.prepare(
-        "INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES (?, 'cancel_bet', ?, ?)"
-      ).run(adminId, bet.user_id, `Cancelled bet #${betId} (${bet.amount} coins refunded)`);
+      await q(
+        "INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES ($1, 'cancel_bet', $2, $3)",
+        [adminId, bet.user_id, `Cancelled bet #${betId} (${bet.amount} coins refunded)`]
+      );
     }
-  })();
+  });
 
-  return { success: true, refunded: bet.amount };
+  return { success: true, refunded: Number(bet.amount) };
 }
 
 // ─── Cancel All Pending Bets ──────────────────────────────────────────────────
@@ -157,26 +168,26 @@ export interface CancelAllResult {
   totalRefunded: number;
 }
 
-export function cancelAllPendingBets(adminId: string): CancelAllResult {
-  const pending = db
-    .prepare("SELECT * FROM bets WHERE status = 'pending'")
-    .all() as unknown as Bet[];
+export async function cancelAllPendingBets(adminId: string): Promise<CancelAllResult> {
+  const pending = await query<Bet>("SELECT * FROM bets WHERE status = 'pending'") as unknown as Bet[];
 
   let totalRefunded = 0;
-  transaction(() => {
+  await withTransaction(async (q) => {
     for (const bet of pending) {
-      db.prepare(
-        "UPDATE bets SET status = 'cancelled', settled_at = unixepoch() WHERE id = ?"
-      ).run(bet.id);
-      coinService.addCoins(bet.user_id, bet.amount);
-      totalRefunded += bet.amount;
+      await q(`UPDATE bets SET status = 'cancelled', settled_at = ${NOW_SQL} WHERE id = $1`, [bet.id]);
+      await q(
+        "UPDATE users SET coins = coins + $1, lifetime_earned = lifetime_earned + $1 WHERE id = $2",
+        [bet.amount, bet.user_id]
+      );
+      totalRefunded += Number(bet.amount);
     }
     if (pending.length > 0) {
-      db.prepare(
-        "INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES (?, 'cancel_all_bets', NULL, ?)"
-      ).run(adminId, `Cancelled ${pending.length} pending bets, refunded ${totalRefunded} coins total`);
+      await q(
+        "INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES ($1, 'cancel_all_bets', NULL, $2)",
+        [adminId, `Cancelled ${pending.length} pending bets, refunded ${totalRefunded} coins total`]
+      );
     }
-  })();
+  });
 
   return { cancelled: pending.length, totalRefunded };
 }
@@ -190,35 +201,39 @@ export interface SettleBetResult {
   payout?: number;
 }
 
-export function manualSettleBet(
+export async function manualSettleBet(
   betId: number,
   outcome: "won" | "lost" | "void",
   adminId: string
-): SettleBetResult {
-  const bet = getBetById(betId);
+): Promise<SettleBetResult> {
+  const bet = await getBetById(betId);
   if (!bet) return { success: false, error: `Bet #${betId} not found.` };
   if (bet.status !== "pending") {
     return { success: false, error: `Bet #${betId} is already **${bet.status}**.` };
   }
 
-  transaction(() => {
-    db.prepare(
-      "UPDATE bets SET status = ?, settled_at = unixepoch() WHERE id = ?"
-    ).run(outcome, betId);
+  await withTransaction(async (q) => {
+    await q(`UPDATE bets SET status = $1, settled_at = ${NOW_SQL} WHERE id = $2`, [outcome, betId]);
 
     if (outcome === "won") {
-      coinService.addCoins(bet.user_id, bet.potential_return);
-      coinService.recordBetWin(bet.user_id, bet.potential_return - bet.amount);
+      await q(
+        "UPDATE users SET coins = coins + $1, lifetime_earned = lifetime_earned + $1, total_wins = total_wins + 1 WHERE id = $2",
+        [bet.potential_return, bet.user_id]
+      );
     } else if (outcome === "void") {
-      coinService.addCoins(bet.user_id, bet.amount);
+      await q(
+        "UPDATE users SET coins = coins + $1, lifetime_earned = lifetime_earned + $1 WHERE id = $2",
+        [bet.amount, bet.user_id]
+      );
     }
 
-    db.prepare(
-      "INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES (?, 'settle_bet', ?, ?)"
-    ).run(adminId, bet.user_id, `Settled bet #${betId} as ${outcome}`);
-  })();
+    await q(
+      "INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES ($1, 'settle_bet', $2, $3)",
+      [adminId, bet.user_id, `Settled bet #${betId} as ${outcome}`]
+    );
+  });
 
   const payout =
-    outcome === "won" ? bet.potential_return : outcome === "void" ? bet.amount : 0;
+    outcome === "won" ? Number(bet.potential_return) : outcome === "void" ? Number(bet.amount) : 0;
   return { success: true, outcome, payout };
 }

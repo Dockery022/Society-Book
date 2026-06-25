@@ -18,8 +18,8 @@ const command: Command = {
     if (!(await requireAdmin(interaction))) return;
     await interaction.deferReply({ ephemeral: true });
 
-    const betId = interaction.options.getInteger("bet_id", true);
-    const result = cancelBet(betId, interaction.user.id);
+    const betId  = interaction.options.getInteger("bet_id", true);
+    const result = await cancelBet(betId, interaction.user.id);
 
     if (!result.success) {
       await interaction.editReply({ embeds: [buildErrorEmbed(result.error ?? "Failed.")] });

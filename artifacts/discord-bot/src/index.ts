@@ -6,7 +6,7 @@ import "dotenv/config";
 import { Client, Collection, GatewayIntentBits, Partials } from "discord.js";
 import type { BotClient, BotEvent, Command } from "./types.js";
 import { commands } from "./commands/index.js";
-import { checkpointDb } from "./database/index.js";
+import { initEmojiCache } from "./services/emojiService.js";
 import readyEvent from "./events/ready.js";
 import interactionCreateEvent from "./events/interactionCreate.js";
 import messageCreateEvent from "./events/messageCreate.js";
@@ -15,7 +15,7 @@ import guildMemberAddEvent from "./events/guildMemberAdd.js";
 
 // ─── Validate Required Environment Variables ──────────────────────────────────
 
-const requiredEnvVars = ["DISCORD_TOKEN", "DISCORD_CLIENT_ID"];
+const requiredEnvVars = ["DISCORD_TOKEN", "DISCORD_CLIENT_ID", "DATABASE_URL"];
 for (const key of requiredEnvVars) {
   if (!process.env[key]) {
     console.error(`[Config] Missing required environment variable: ${key}`);
@@ -79,19 +79,21 @@ process.on("uncaughtException", (error) => {
 });
 
 // ─── Graceful Shutdown ────────────────────────────────────────────────────────
-// Flush all pending WAL writes to the DB file before the process is killed.
 
-function shutdown(signal: string) {
-  console.log(`[Bot] ${signal} received — checkpointing database…`);
-  checkpointDb();
-  console.log("[Bot] Database checkpointed. Exiting.");
+process.on("SIGTERM", () => {
+  console.log("[Bot] SIGTERM received — shutting down gracefully.");
   process.exit(0);
-}
+});
 
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT",  () => shutdown("SIGINT"));
+process.on("SIGINT", () => {
+  console.log("[Bot] SIGINT received — shutting down gracefully.");
+  process.exit(0);
+});
 
-// ─── Connect to Discord ───────────────────────────────────────────────────────
+// ─── Bootstrap ────────────────────────────────────────────────────────────────
+// database/index.ts runs initSchema() at module load time (top-level await).
+// Warm the emoji cache before connecting so getCoinEmoji() is ready immediately.
 
+await initEmojiCache();
 console.log("[Bot] Starting The Society Book…");
 await client.login(process.env.DISCORD_TOKEN);

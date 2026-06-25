@@ -4,7 +4,7 @@
  * Falls back to the standard coin emoji if custom ones aren't set up yet.
  */
 
-import db from "../database/index.js";
+import { queryOne, execute } from "../database/index.js";
 
 export interface CoinEmojis {
   coin_1: string;
@@ -17,11 +17,14 @@ export interface CoinEmojis {
 
 const FALLBACK = "🪙";
 
+/** In-memory cache — null = not configured, undefined = not yet loaded */
+let cachedEmojis: CoinEmojis | null | undefined = undefined;
+
 /** Load stored emoji tags from the DB (returns null if not set up yet) */
-export function loadCoinEmojis(): CoinEmojis | null {
-  const row = db
-    .prepare("SELECT value FROM bot_settings WHERE key = 'coin_emojis'")
-    .get() as { value: string } | undefined;
+export async function loadCoinEmojis(): Promise<CoinEmojis | null> {
+  const row = await queryOne<{ value: string }>(
+    "SELECT value FROM bot_settings WHERE key = 'coin_emojis'"
+  );
   if (!row) return null;
   try {
     return JSON.parse(row.value) as CoinEmojis;
@@ -30,29 +33,28 @@ export function loadCoinEmojis(): CoinEmojis | null {
   }
 }
 
-/** Save emoji tags to the DB */
-export function saveCoinEmojis(emojis: CoinEmojis): void {
-  db.prepare(
-    "INSERT INTO bot_settings (key, value) VALUES ('coin_emojis', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
-  ).run(JSON.stringify(emojis));
-  // Bust the in-memory cache
+/** Populate the in-memory cache at startup */
+export async function initEmojiCache(): Promise<void> {
+  cachedEmojis = await loadCoinEmojis();
+}
+
+/** Save emoji tags to the DB and bust the cache */
+export async function saveCoinEmojis(emojis: CoinEmojis): Promise<void> {
+  await execute(
+    `INSERT INTO bot_settings (key, value) VALUES ('coin_emojis', $1)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [JSON.stringify(emojis)]
+  );
   cachedEmojis = emojis;
 }
 
 /** Clear stored emoji tags (resets to fallback) */
-export function clearCoinEmojis(): void {
-  db.prepare("DELETE FROM bot_settings WHERE key = 'coin_emojis'").run();
+export async function clearCoinEmojis(): Promise<void> {
+  await execute("DELETE FROM bot_settings WHERE key = 'coin_emojis'");
   cachedEmojis = null;
 }
 
-// ── In-memory cache (populated on first use or after /setupemojis) ────────────
-
-let cachedEmojis: CoinEmojis | null | undefined = undefined;
-
-function getEmojis(): CoinEmojis | null {
-  if (cachedEmojis === undefined) cachedEmojis = loadCoinEmojis();
-  return cachedEmojis;
-}
+// ─── Sync helpers (use cached value set at startup) ───────────────────────────
 
 /**
  * Pick the best denomination emoji for a given coin amount.
@@ -60,7 +62,7 @@ function getEmojis(): CoinEmojis | null {
  * Falls back to 🪙 if custom emojis aren't configured.
  */
 export function getCoinEmoji(amount: number): string {
-  const emojis = getEmojis();
+  const emojis = cachedEmojis ?? null;
   if (!emojis) return FALLBACK;
 
   if (Math.abs(amount) >= 100) return emojis.coin_100;
@@ -73,5 +75,5 @@ export function getCoinEmoji(amount: number): string {
 
 /** True if custom coin emojis have been configured */
 export function hasCustomEmojis(): boolean {
-  return getEmojis() !== null;
+  return cachedEmojis !== null && cachedEmojis !== undefined;
 }

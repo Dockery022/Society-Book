@@ -14,6 +14,7 @@ import {
   TextInputStyle,
   ComponentType,
   EmbedBuilder,
+  AttachmentBuilder,
   type MessageComponentInteraction,
   type StringSelectMenuInteraction,
   type ChatInputCommandInteraction,
@@ -26,7 +27,6 @@ import { isPremium, requireGuildMember } from "../utils/permissions.js";
 import { buildBetSlipEmbed, buildErrorEmbed } from "../utils/embeds.js";
 import { isoToUnix, formatCoins, formatDateTime } from "../utils/formatters.js";
 import { generateMatchupImage } from "../utils/matchupImageGenerator.js";
-import { AttachmentBuilder } from "discord.js";
 
 const TIMEOUT_MS = 180_000;
 
@@ -138,7 +138,7 @@ export async function showAmountModal(
   selection: { team: string; odds: number; line: number | null },
   originalInteraction: ChatInputCommandInteraction
 ): Promise<void> {
-  const balance = getBalance(originalInteraction.user.id);
+  const balance = await getBalance(originalInteraction.user.id);
 
   const modal = new ModalBuilder()
     .setCustomId("bet_amount_modal")
@@ -146,7 +146,7 @@ export async function showAmountModal(
 
   const amountInput = new TextInputBuilder()
     .setCustomId("bet_amount_input")
-    .setLabel(`Balance: ${balance.toLocaleString()} coins`)
+    .setLabel(`Balance: ${Number(balance).toLocaleString()} coins`)
     .setPlaceholder("Enter amount (e.g. 250)")
     .setStyle(TextInputStyle.Short)
     .setRequired(true)
@@ -212,7 +212,7 @@ export async function showAmountModal(
     potentialReturn: calcPotentialReturn(selection.odds, amount),
   };
 
-  const result = placeBet(originalInteraction.user.id, slip);
+  const result = await placeBet(originalInteraction.user.id, slip);
 
   if (!result.success || !result.bet) {
     await originalInteraction.editReply({
@@ -228,7 +228,6 @@ export async function showAmountModal(
     : originalInteraction.user.username;
   slipEmbed.setTitle(`✅ Bet placed by ${username}`);
 
-  // Generate matchup image — attach if successful, fall back gracefully
   try {
     const imgBuffer = await generateMatchupImage(game.away_team, game.home_team);
     const attachment = new AttachmentBuilder(imgBuffer, { name: "matchup.png" });

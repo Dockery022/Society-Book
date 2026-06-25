@@ -240,7 +240,7 @@ const command: Command = {
     .setDescription("Place a wager on an upcoming game using 1912 Coins."),
 
   async execute(interaction) {
-    if (areBetsLocked()) {
+    if (await areBetsLocked()) {
       await interaction.reply({
         content: "🔒 Betting is currently **locked** by an admin. Check back soon!",
         ephemeral: true,

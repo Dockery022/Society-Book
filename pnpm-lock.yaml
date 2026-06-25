@@ -218,6 +218,9 @@ importers:
       '@napi-rs/canvas':
         specifier: ^1.0.0
         version: 1.0.0
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
       axios:
         specifier: ^1.7.9
         version: 1.18.0
@@ -230,6 +233,9 @@ importers:
       node-cron:
         specifier: ^3.0.3
         version: 3.0.3
+      pg:
+        specifier: ^8.20.0
+        version: 8.20.0
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

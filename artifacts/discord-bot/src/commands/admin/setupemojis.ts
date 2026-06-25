@@ -74,7 +74,7 @@ const command: Command = {
 
     // If all 6 uploaded successfully, save and activate
     if (Object.keys(tags).length === 6) {
-      saveCoinEmojis(tags as CoinEmojis);
+      await saveCoinEmojis(tags as CoinEmojis);
       await interaction.editReply({
         content: [
           "**✅ Coin emoji uploaded and activated!**",
@@ -84,7 +84,7 @@ const command: Command = {
       });
     } else {
       // Partial success — clear so we don't use an incomplete set
-      clearCoinEmojis();
+      await clearCoinEmojis();
       await interaction.editReply({
         content: [
           "**⚠️ Some emoji failed to upload.** The bot will use 🪙 until all succeed.\n",

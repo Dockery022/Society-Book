@@ -19,7 +19,6 @@ const SORT_OPTIONS = [
 
 type SortKey = (typeof SORT_OPTIONS)[number]["value"];
 
-/** Fetch display names for the top-10 entries from the guild. */
 async function buildNameMap(
   interaction: ChatInputCommandInteraction,
   entries: LeaderboardEntry[]
@@ -53,7 +52,7 @@ const command: Command = {
   async execute(interaction) {
     await interaction.deferReply();
 
-    const entries = getLeaderboard("coins");
+    const entries = await getLeaderboard("coins");
     const names   = await buildNameMap(interaction, entries);
     const embed   = buildLeaderboardEmbed(entries, "💰 Current Balance", names);
 
@@ -69,7 +68,7 @@ const command: Command = {
         )
       );
 
-    const row  = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+    const row   = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
     const reply = await interaction.editReply({ embeds: [embed], components: [row] });
 
     const collector = reply.createMessageComponentCollector({
@@ -81,7 +80,7 @@ const command: Command = {
     collector.on("collect", async (si) => {
       const sortKey    = si.values[0] as SortKey;
       const sortOption = SORT_OPTIONS.find((o) => o.value === sortKey)!;
-      const newEntries = getLeaderboard(sortKey);
+      const newEntries = await getLeaderboard(sortKey);
       const newNames   = await buildNameMap(interaction, newEntries);
       const newEmbed   = buildLeaderboardEmbed(newEntries, sortOption.label, newNames);
       await si.update({ embeds: [newEmbed], components: [row] });

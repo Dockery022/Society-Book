@@ -16,10 +16,10 @@ const command: Command = {
     if (!member) return;
 
     const premium = isPremium(member);
-    const result = claimDaily(interaction.user.id, premium);
+    const result = await claimDaily(interaction.user.id, premium);
 
     if (result.alreadyClaimed) {
-      const resetTime = getNextDailyReset(interaction.user.id);
+      const resetTime = await getNextDailyReset(interaction.user.id);
       const resetUnix = resetTime ? Math.floor(resetTime.getTime() / 1000) : null;
 
       const embed = new EmbedBuilder()
@@ -39,9 +39,7 @@ const command: Command = {
     const embed = new EmbedBuilder()
       .setColor(0xf1c40f)
       .setTitle("🎁 Daily Reward Claimed!")
-      .setDescription(
-        `You received **${formatCoins(result.amount)}**!\n\n*Tier: ${tierLabel}*`
-      )
+      .setDescription(`You received **${formatCoins(result.amount)}**!\n\n*Tier: ${tierLabel}*`)
       .addFields({
         name: "Tip",
         value: premium

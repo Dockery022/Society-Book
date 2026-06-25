@@ -1,10 +1,10 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { Command } from "../../types.js";
 import { removeCoins, getBalance } from "../../services/coinService.js";
+import { execute } from "../../database/index.js";
 import { requireModerator } from "../../utils/permissions.js";
 import { buildSuccessEmbed } from "../../utils/embeds.js";
 import { formatCoins } from "../../utils/formatters.js";
-import db from "../../database/index.js";
 
 const command: Command = {
   adminOnly: true,
@@ -34,17 +34,14 @@ const command: Command = {
     const amount = interaction.options.getInteger("amount", true);
     const reason = interaction.options.getString("reason") ?? "Admin adjustment";
 
-    const before = getBalance(target.id);
-    removeCoins(target.id, amount, reason);
-    const newBalance = getBalance(target.id);
+    const before     = await getBalance(target.id);
+    await removeCoins(target.id, amount, reason);
+    const newBalance = await getBalance(target.id);
     const actualRemoved = before - newBalance;
 
-    db.prepare(
-      "INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES (?, 'remove_coins', ?, ?)"
-    ).run(
-      interaction.user.id,
-      target.id,
-      `Removed ${actualRemoved} coins (requested ${amount}). Reason: ${reason}. New balance: ${newBalance}`
+    await execute(
+      "INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES ($1, 'remove_coins', $2, $3)",
+      [interaction.user.id, target.id, `Removed ${actualRemoved} coins (requested ${amount}). Reason: ${reason}. New balance: ${newBalance}`]
     );
 
     await interaction.editReply({

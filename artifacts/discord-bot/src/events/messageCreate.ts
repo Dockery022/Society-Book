@@ -10,7 +10,7 @@ const messageCreateEvent: BotEvent = {
     if (!message.guild) return;
     if (message.system) return;
     if (!message.content && message.attachments.size === 0) return;
-    tryAwardMessageCoins(message.author.id);
+    void tryAwardMessageCoins(message.author.id);
   },
 };
 

@@ -19,8 +19,8 @@ const command: Command = {
         .setDescription("Outcome of the bet")
         .setRequired(true)
         .addChoices(
-          { name: "✅ Won", value: "won" },
-          { name: "❌ Lost", value: "lost" },
+          { name: "✅ Won",          value: "won"  },
+          { name: "❌ Lost",         value: "lost" },
           { name: "↩️ Void (Push)", value: "void" }
         )
     ),
@@ -29,10 +29,9 @@ const command: Command = {
     if (!(await requireAdmin(interaction))) return;
     await interaction.deferReply({ ephemeral: true });
 
-    const betId = interaction.options.getInteger("bet_id", true);
+    const betId   = interaction.options.getInteger("bet_id", true);
     const outcome = interaction.options.getString("outcome", true) as "won" | "lost" | "void";
-
-    const result = manualSettleBet(betId, outcome, interaction.user.id);
+    const result  = await manualSettleBet(betId, outcome, interaction.user.id);
 
     if (!result.success) {
       await interaction.editReply({ embeds: [buildErrorEmbed(result.error ?? "Failed.")] });

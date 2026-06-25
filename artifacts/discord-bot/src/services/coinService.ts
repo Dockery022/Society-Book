@@ -3,7 +3,7 @@
  * Handles all coin balance operations, cooldowns, and daily rewards.
  */
 
-import db, { ensureUser, transaction } from "../database/index.js";
+import { query, queryOne, execute, ensureUser } from "../database/index.js";
 import type { User, DailyClaim } from "../types.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -23,59 +23,60 @@ const MAX_WAGER_PREMIUM = 5000;
 
 // ─── Balance Operations ───────────────────────────────────────────────────────
 
-export function getAllUserIds(): string[] {
-  const rows = db.prepare("SELECT id FROM users").all() as { id: string }[];
+export async function getAllUserIds(): Promise<string[]> {
+  const rows = await query<{ id: string }>("SELECT id FROM users");
   return rows.map((r) => r.id);
 }
 
-export function addCoinsToAllUsers(amount: number, adminId: string): number {
-  const ids = getAllUserIds();
-  transaction(() => {
-    db.prepare(
-      "UPDATE users SET coins = coins + ?, lifetime_earned = lifetime_earned + ?"
-    ).run(amount, amount);
-    db.prepare(
-      "INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES (?, 'server_bonus', NULL, ?)"
-    ).run(adminId, `Gave ${amount} coins to all ${ids.length} users`);
-  })();
+export async function addCoinsToAllUsers(amount: number, adminId: string): Promise<number> {
+  const ids = await getAllUserIds();
+  await execute(
+    "UPDATE users SET coins = coins + $1, lifetime_earned = lifetime_earned + $1",
+    [amount]
+  );
+  await execute(
+    "INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES ($1, 'server_bonus', NULL, $2)",
+    [adminId, `Gave ${amount} coins to all ${ids.length} users`]
+  );
   return ids.length;
 }
 
-export function getBalance(userId: string): number {
-  ensureUser(userId);
-  const row = db.prepare("SELECT coins FROM users WHERE id = ?").get(userId) as
-    | { coins: number }
-    | undefined;
+export async function getBalance(userId: string): Promise<number> {
+  await ensureUser(userId);
+  const row = await queryOne<{ coins: number }>("SELECT coins FROM users WHERE id = $1", [userId]);
   return row?.coins ?? 500;
 }
 
-export function getUser(userId: string): User {
-  ensureUser(userId);
-  return db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as unknown as User;
+export async function getUser(userId: string): Promise<User> {
+  await ensureUser(userId);
+  return (await queryOne<User>("SELECT * FROM users WHERE id = $1", [userId])) as unknown as User;
 }
 
-export function addCoins(userId: string, amount: number, _reason?: string): void {
-  ensureUser(userId);
-  db.prepare(
-    "UPDATE users SET coins = coins + ?, lifetime_earned = lifetime_earned + ? WHERE id = ?"
-  ).run(amount, amount, userId);
+export async function addCoins(userId: string, amount: number, _reason?: string): Promise<void> {
+  await ensureUser(userId);
+  await execute(
+    "UPDATE users SET coins = coins + $1, lifetime_earned = lifetime_earned + $1 WHERE id = $2",
+    [amount, userId]
+  );
 }
 
-export function removeCoins(userId: string, amount: number, _reason?: string): void {
-  ensureUser(userId);
-  db.prepare(
-    "UPDATE users SET coins = MAX(0, coins - ?), lifetime_lost = lifetime_lost + ? WHERE id = ?"
-  ).run(amount, amount, userId);
+export async function removeCoins(userId: string, amount: number, _reason?: string): Promise<void> {
+  await ensureUser(userId);
+  await execute(
+    "UPDATE users SET coins = GREATEST(0, coins - $1), lifetime_lost = lifetime_lost + $1 WHERE id = $2",
+    [amount, userId]
+  );
 }
 
-export function recordBetWin(userId: string, profit: number): void {
-  db.prepare(
-    "UPDATE users SET total_wins = total_wins + 1, lifetime_earned = lifetime_earned + ? WHERE id = ?"
-  ).run(profit, userId);
+export async function recordBetWin(userId: string, profit: number): Promise<void> {
+  await execute(
+    "UPDATE users SET total_wins = total_wins + 1, lifetime_earned = lifetime_earned + $1 WHERE id = $2",
+    [profit, userId]
+  );
 }
 
-export function recordBetPlace(userId: string): void {
-  db.prepare("UPDATE users SET total_bets = total_bets + 1 WHERE id = ?").run(userId);
+export async function recordBetPlace(userId: string): Promise<void> {
+  await execute("UPDATE users SET total_bets = total_bets + 1 WHERE id = $1", [userId]);
 }
 
 export function getMaxWager(isPremium: boolean): number {
@@ -86,47 +87,49 @@ export function getMaxWager(isPremium: boolean): number {
 
 type CooldownType = "message" | "reaction_given";
 
-function checkCooldown(
+async function checkCooldown(
   userId: string,
   type: CooldownType,
   cooldownMs: number
-): { allowed: boolean } {
+): Promise<{ allowed: boolean }> {
   const now = Date.now();
-  const row = db
-    .prepare("SELECT last_triggered FROM cooldowns WHERE user_id = ? AND type = ?")
-    .get(userId, type) as { last_triggered: number } | undefined;
-
+  const row = await queryOne<{ last_triggered: number }>(
+    "SELECT last_triggered FROM cooldowns WHERE user_id = $1 AND type = $2",
+    [userId, type]
+  );
   if (!row) return { allowed: true };
-  return { allowed: now - row.last_triggered >= cooldownMs };
+  return { allowed: now - Number(row.last_triggered) >= cooldownMs };
 }
 
-function updateCooldown(userId: string, type: CooldownType): void {
-  db.prepare(
-    "INSERT INTO cooldowns (user_id, type, last_triggered) VALUES (?, ?, ?) ON CONFLICT(user_id, type) DO UPDATE SET last_triggered = excluded.last_triggered"
-  ).run(userId, type, Date.now());
+async function updateCooldown(userId: string, type: CooldownType): Promise<void> {
+  await execute(
+    `INSERT INTO cooldowns (user_id, type, last_triggered) VALUES ($1, $2, $3)
+     ON CONFLICT (user_id, type) DO UPDATE SET last_triggered = EXCLUDED.last_triggered`,
+    [userId, type, Date.now()]
+  );
 }
 
 // ─── Reward Triggers ──────────────────────────────────────────────────────────
 
-export function tryAwardMessageCoins(userId: string): boolean {
-  if (!checkCooldown(userId, "message", MESSAGE_COOLDOWN_MS).allowed) return false;
-  ensureUser(userId);
-  addCoins(userId, MESSAGE_REWARD);
-  updateCooldown(userId, "message");
+export async function tryAwardMessageCoins(userId: string): Promise<boolean> {
+  if (!(await checkCooldown(userId, "message", MESSAGE_COOLDOWN_MS)).allowed) return false;
+  await ensureUser(userId);
+  await addCoins(userId, MESSAGE_REWARD);
+  await updateCooldown(userId, "message");
   return true;
 }
 
-export function tryAwardReactionGivenCoins(userId: string): boolean {
-  if (!checkCooldown(userId, "reaction_given", REACTION_COOLDOWN_MS).allowed) return false;
-  ensureUser(userId);
-  addCoins(userId, REACTION_GIVEN_REWARD);
-  updateCooldown(userId, "reaction_given");
+export async function tryAwardReactionGivenCoins(userId: string): Promise<boolean> {
+  if (!(await checkCooldown(userId, "reaction_given", REACTION_COOLDOWN_MS)).allowed) return false;
+  await ensureUser(userId);
+  await addCoins(userId, REACTION_GIVEN_REWARD);
+  await updateCooldown(userId, "reaction_given");
   return true;
 }
 
-export function awardReactionReceivedCoins(userId: string): void {
-  ensureUser(userId);
-  addCoins(userId, REACTION_RECEIVED_REWARD);
+export async function awardReactionReceivedCoins(userId: string): Promise<void> {
+  await ensureUser(userId);
+  await addCoins(userId, REACTION_RECEIVED_REWARD);
 }
 
 // ─── Daily Rewards ────────────────────────────────────────────────────────────
@@ -135,34 +138,38 @@ function todayDateString(): string {
   return new Date().toISOString().split("T")[0]!;
 }
 
-export function claimDaily(
+export async function claimDaily(
   userId: string,
   isPremium: boolean
-): { success: boolean; amount: number; alreadyClaimed: boolean } {
-  ensureUser(userId);
+): Promise<{ success: boolean; amount: number; alreadyClaimed: boolean }> {
+  await ensureUser(userId);
   const today = todayDateString();
-  const claim = db
-    .prepare("SELECT last_claimed FROM daily_claims WHERE user_id = ?")
-    .get(userId) as DailyClaim | undefined;
+  const claim = await queryOne<DailyClaim>(
+    "SELECT last_claimed FROM daily_claims WHERE user_id = $1",
+    [userId]
+  );
 
   if (claim?.last_claimed === today) {
     return { success: false, amount: 0, alreadyClaimed: true };
   }
 
   const amount = isPremium ? DAILY_PREMIUM : DAILY_FREE;
-  addCoins(userId, amount);
+  await addCoins(userId, amount);
 
-  db.prepare(
-    "INSERT INTO daily_claims (user_id, last_claimed) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET last_claimed = excluded.last_claimed"
-  ).run(userId, today);
+  await execute(
+    `INSERT INTO daily_claims (user_id, last_claimed) VALUES ($1, $2)
+     ON CONFLICT (user_id) DO UPDATE SET last_claimed = EXCLUDED.last_claimed`,
+    [userId, today]
+  );
 
   return { success: true, amount, alreadyClaimed: false };
 }
 
-export function getNextDailyReset(userId: string): Date | null {
-  const claim = db
-    .prepare("SELECT last_claimed FROM daily_claims WHERE user_id = ?")
-    .get(userId) as DailyClaim | undefined;
+export async function getNextDailyReset(userId: string): Promise<Date | null> {
+  const claim = await queryOne<DailyClaim>(
+    "SELECT last_claimed FROM daily_claims WHERE user_id = $1",
+    [userId]
+  );
   if (!claim) return null;
   const next = new Date(claim.last_claimed);
   next.setDate(next.getDate() + 1);
@@ -181,21 +188,20 @@ export interface LeaderboardEntry {
   total_wins: number;
 }
 
-export function getLeaderboard(
+export async function getLeaderboard(
   sortBy: "coins" | "lifetime_earned" | "win_rate" | "total_bets",
   limit = 10
-): LeaderboardEntry[] {
+): Promise<LeaderboardEntry[]> {
   const orderMap: Record<string, string> = {
-    coins: "coins DESC",
+    coins:           "coins DESC",
     lifetime_earned: "lifetime_earned DESC",
-    win_rate: "CAST(total_wins AS REAL) / MAX(total_bets, 1) DESC, total_bets DESC",
-    total_bets: "total_bets DESC",
+    win_rate:        "CAST(total_wins AS FLOAT) / GREATEST(total_bets, 1) DESC, total_bets DESC",
+    total_bets:      "total_bets DESC",
   };
   const order = orderMap[sortBy] ?? "coins DESC";
-  return db
-    .prepare(
-      `SELECT id, coins, lifetime_earned, lifetime_lost, total_bets, total_wins
-       FROM users ORDER BY ${order} LIMIT ?`
-    )
-    .all(limit) as unknown as LeaderboardEntry[];
+  return query<LeaderboardEntry>(
+    `SELECT id, coins, lifetime_earned, lifetime_lost, total_bets, total_wins
+     FROM users ORDER BY ${order} LIMIT $1`,
+    [limit]
+  ) as unknown as Promise<LeaderboardEntry[]>;
 }

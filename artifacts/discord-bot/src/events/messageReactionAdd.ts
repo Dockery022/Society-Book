@@ -28,12 +28,10 @@ const messageReactionAddEvent: BotEvent = {
 
     const author = fullMessage.author;
 
-    // Award coins for giving a reaction (30s cooldown)
-    tryAwardReactionGivenCoins(user.id);
+    void tryAwardReactionGivenCoins(user.id);
 
-    // Award the message author for receiving a reaction (no cooldown, no self-reactions)
     if (author && !author.bot && author.id !== user.id) {
-      awardReactionReceivedCoins(author.id);
+      void awardReactionReceivedCoins(author.id);
     }
   },
 };
