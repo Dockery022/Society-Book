@@ -1,11 +1,14 @@
 /**
- * Team data: primary brand color + logo URL for matchup image generation.
+ * Team data: primary brand color + logo URL/path for matchup image generation.
  * Logo URLs use ESPN's public CDN for US sports; flagcdn.com for soccer.
+ * logoPath is an absolute filesystem path for locally bundled NCAA logos.
  */
+import { NCAA } from "./ncaaTeams.js";
 
 export interface TeamData {
   primary: string;
-  logoUrl: string;
+  logoUrl?: string;
+  logoPath?: string;
 }
 
 const MLB: Record<string, TeamData> = {
@@ -206,9 +209,10 @@ const TEAM_DB: Record<string, TeamData> = {
   ...NBA,
   ...WNBA,
   ...SOCCER,
+  ...NCAA,
 };
 
-const DEFAULT: TeamData = { primary: "#1a1a2e", logoUrl: "" };
+const DEFAULT: TeamData = { primary: "#1a1a2e" };
 
 export function getTeamData(teamName: string): TeamData {
   return TEAM_DB[teamName] ?? DEFAULT;

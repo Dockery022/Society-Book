@@ -5,7 +5,9 @@
 
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import type { Image } from "@napi-rs/canvas";
+import { readFile } from "fs/promises";
 import { getTeamData } from "../data/teams.js";
+import type { TeamData } from "../data/teams.js";
 
 const W = 1280;
 const H = 720;
@@ -14,10 +16,26 @@ const H = 720;
 const SPLIT_TOP = 590;
 const SPLIT_BOT = 700;
 
-// In-memory logo cache — persist across bets
+// In-memory logo cache — keyed by path or URL, persists across bets
 const logoCache = new Map<string, Image | null>();
 
-async function fetchLogo(url: string): Promise<Image | null> {
+async function fetchLogo(team: TeamData): Promise<Image | null> {
+  // Prefer local file (NCAA logos) — faster and no network dependency
+  if (team.logoPath) {
+    const key = team.logoPath;
+    if (logoCache.has(key)) return logoCache.get(key)!;
+    try {
+      const buf = await readFile(team.logoPath);
+      const img = await loadImage(buf);
+      logoCache.set(key, img);
+      return img;
+    } catch {
+      logoCache.set(key, null);
+      return null;
+    }
+  }
+  // Fall back to remote URL (NFL / NBA / MLB / WNBA / Soccer)
+  const url = team.logoUrl ?? "";
   if (logoCache.has(url)) return logoCache.get(url)!;
   if (!url) { logoCache.set(url, null); return null; }
   try {
@@ -47,8 +65,8 @@ export async function generateMatchupImage(
 
   // Fetch logos in parallel — don't block if one fails
   const [awayLogo, homeLogo] = await Promise.all([
-    fetchLogo(away.logoUrl),
-    fetchLogo(home.logoUrl),
+    fetchLogo(away),
+    fetchLogo(home),
   ]);
 
   const canvas = createCanvas(W, H);
