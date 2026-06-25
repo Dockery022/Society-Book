@@ -6,7 +6,6 @@ import "dotenv/config";
 import { Client, Collection, GatewayIntentBits, Partials } from "discord.js";
 import type { BotClient, BotEvent, Command } from "./types.js";
 import { commands } from "./commands/index.js";
-import { initEmojiCache } from "./services/emojiService.js";
 import readyEvent from "./events/ready.js";
 import interactionCreateEvent from "./events/interactionCreate.js";
 import messageCreateEvent from "./events/messageCreate.js";
@@ -91,9 +90,5 @@ process.on("SIGINT", () => {
 });
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
-// database/index.ts runs initSchema() at module load time (top-level await).
-// Warm the emoji cache before connecting so getCoinEmoji() is ready immediately.
-
-await initEmojiCache();
 console.log("[Bot] Starting The Society Book…");
 await client.login(process.env.DISCORD_TOKEN);
