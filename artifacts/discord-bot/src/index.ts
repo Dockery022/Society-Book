@@ -6,6 +6,7 @@ import "dotenv/config";
 import { Client, Collection, GatewayIntentBits, Partials } from "discord.js";
 import type { BotClient, BotEvent, Command } from "./types.js";
 import { commands } from "./commands/index.js";
+import { checkpointDb } from "./database/index.js";
 import readyEvent from "./events/ready.js";
 import interactionCreateEvent from "./events/interactionCreate.js";
 import messageCreateEvent from "./events/messageCreate.js";
@@ -76,6 +77,19 @@ process.on("uncaughtException", (error) => {
   console.error("[Process] Uncaught exception:", error);
   process.exit(1);
 });
+
+// ─── Graceful Shutdown ────────────────────────────────────────────────────────
+// Flush all pending WAL writes to the DB file before the process is killed.
+
+function shutdown(signal: string) {
+  console.log(`[Bot] ${signal} received — checkpointing database…`);
+  checkpointDb();
+  console.log("[Bot] Database checkpointed. Exiting.");
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT",  () => shutdown("SIGINT"));
 
 // ─── Connect to Discord ───────────────────────────────────────────────────────
 

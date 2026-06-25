@@ -21,9 +21,20 @@ if (!fs.existsSync(dbDir)) {
 // Open the database
 const db = new DatabaseSync(path.resolve(DB_PATH));
 
-// Enable WAL mode for better performance
+// Enable WAL mode; checkpoint every 100 pages (~400 KB) instead of default 1000
 db.exec("PRAGMA journal_mode = WAL;");
 db.exec("PRAGMA foreign_keys = ON;");
+db.exec("PRAGMA wal_autocheckpoint = 100;");
+db.exec("PRAGMA synchronous = NORMAL;");
+
+/** Flush all pending WAL writes to the main DB file. Call before shutdown. */
+export function checkpointDb(): void {
+  try {
+    db.exec("PRAGMA wal_checkpoint(FULL);");
+  } catch {
+    // best-effort
+  }
+}
 
 // ─── Transaction Helper ───────────────────────────────────────────────────────
 // Mimics better-sqlite3's db.transaction() pattern.
