@@ -1,8 +1,10 @@
 /**
- * /setupemojis — uploads the 6 custom 1912 coin images as server emoji,
- * then stores their tags so the bot uses them everywhere.
+ * /setupemojis — registers the 6 custom coin emoji with the bot.
  *
- * Re-running overwrites any previously uploaded set.
+ * If the emoji already exist on the server (manually uploaded or previously set up),
+ * it reuses them without deleting/re-uploading. Only uploads from the bot's asset
+ * files when an emoji with that name isn't found on the server.
+ *
  * Requires: bot has Manage Emojis permission (or Administrator).
  */
 
@@ -31,7 +33,7 @@ const command: Command = {
   adminOnly: true,
   data: new SlashCommandBuilder()
     .setName("setupemojis")
-    .setDescription("[Admin] Upload the 1912 coin images as server emoji and activate them."),
+    .setDescription("[Admin] Register the 1912 coin emoji with the bot (reuses existing ones if present)."),
 
   async execute(interaction) {
     if (!(await requireAdmin(interaction))) return;
@@ -42,18 +44,24 @@ const command: Command = {
 
     await interaction.deferReply({ ephemeral: true });
 
-    // Delete any previously uploaded coin emoji to avoid duplicates
-    const existing = interaction.guild.emojis.cache.filter((e) =>
-      COIN_DEFS.some((d) => d.name === e.name)
-    );
-    for (const [, emoji] of existing) {
-      try { await emoji.delete("Replaced by /setupemojis"); } catch { /* ignore */ }
-    }
+    // Fetch the latest emoji list so the cache is up to date
+    await interaction.guild.emojis.fetch();
 
     const tags: Partial<CoinEmojis> = {};
     const results: string[] = [];
 
     for (const def of COIN_DEFS) {
+      // Check if an emoji with this name already exists on the server
+      const existing = interaction.guild.emojis.cache.find((e) => e.name === def.name);
+
+      if (existing) {
+        // Reuse the existing emoji — no upload needed
+        tags[def.key] = `<:${existing.name}:${existing.id}>`;
+        results.push(`✅ <:${existing.name}:${existing.id}> \`${def.name}\` *(already on server)*`);
+        continue;
+      }
+
+      // Emoji not found — upload from the bot's bundled asset
       try {
         const imgPath = join(ASSETS_DIR, def.file);
         const attachment = readFileSync(imgPath);
@@ -65,31 +73,29 @@ const command: Command = {
         });
 
         tags[def.key] = `<:${emoji.name}:${emoji.id}>`;
-        results.push(`✅ <:${emoji.name}:${emoji.id}> \`${def.name}\``);
+        results.push(`✅ <:${emoji.name}:${emoji.id}> \`${def.name}\` *(uploaded)*`);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         results.push(`❌ \`${def.name}\` — ${msg}`);
       }
     }
 
-    // If all 6 uploaded successfully, save and activate
     if (Object.keys(tags).length === 6) {
       await saveCoinEmojis(tags as CoinEmojis);
       await interaction.editReply({
         content: [
-          "**✅ Coin emoji uploaded and activated!**",
+          "**✅ Coin emoji activated!**",
           "The bot will now use these across all commands:\n",
           results.join("\n"),
         ].join("\n"),
       });
     } else {
-      // Partial success — clear so we don't use an incomplete set
       await clearCoinEmojis();
       await interaction.editReply({
         content: [
-          "**⚠️ Some emoji failed to upload.** The bot will use 🪙 until all succeed.\n",
+          "**⚠️ Some emoji couldn't be found or uploaded.** The bot will use 🪙 until all 6 are available.\n",
           results.join("\n"),
-          "\nMake sure the bot has **Manage Emojis** permission and your server isn't at its emoji limit.",
+          "\nMake sure all 6 coin emoji (`coin1` through `coin100`) are on the server and the bot has **Manage Emojis** permission.",
         ].join("\n"),
       });
     }
