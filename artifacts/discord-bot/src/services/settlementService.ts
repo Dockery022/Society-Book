@@ -32,9 +32,40 @@ async function fetchCompletedScores(sportKey: string): Promise<ScoreEvent[]> {
       { params: { apiKey: getApiKey(), daysFrom: 3 }, timeout: 10_000 }
     );
     return resp.data.filter((e) => e.completed && e.scores && e.scores.length > 0);
-  } catch {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[Settlement] ⚠️  Failed to fetch scores for ${sportKey}: ${msg}`);
     return [];
   }
+}
+
+/**
+ * Void all pending bets whose game started more than 4 days ago.
+ * These are permanently outside the Odds API's 3-day scores window and
+ * can never be auto-settled — refund the wager so users aren't stuck.
+ */
+async function voidStaleBets(): Promise<void> {
+  const stale = await query<Bet>(
+    `SELECT * FROM bets WHERE status = 'pending'
+     AND TO_TIMESTAMP(commence_time) < NOW() - INTERVAL '4 days'`
+  ) as unknown as Bet[];
+
+  if (stale.length === 0) return;
+
+  console.warn(`[Settlement] ⚠️  Found ${stale.length} stale bet(s) older than 4 days — voiding and refunding.`);
+
+  await withTransaction(async (q) => {
+    for (const bet of stale) {
+      await q(`UPDATE bets SET status = 'void', settled_at = ${NOW_SQL} WHERE id = $1`, [bet.id]);
+      await q(
+        "UPDATE users SET coins = coins + $1, lifetime_earned = lifetime_earned + $1 WHERE id = $2",
+        [bet.amount, bet.user_id]
+      );
+      console.warn(
+        `[Settlement] ↩️  Voided stale bet #${bet.id} (${bet.away_team} @ ${bet.home_team}, ${bet.sport}) — refunded ${bet.amount} coins to user ${bet.user_id}`
+      );
+    }
+  });
 }
 
 function determineBetOutcome(
@@ -126,6 +157,9 @@ export async function settleGameBets(
 export function startSettlementScheduler(): void {
   cron.schedule("*/15 * * * *", async () => {
     console.log("[Settlement] Checking for completed games…");
+
+    // Void any bets that have aged past the Odds API's 3-day scores window
+    await voidStaleBets();
 
     const pendingGames = await query<{ game_id: string; sport: string }>(
       "SELECT DISTINCT game_id, sport FROM bets WHERE status = 'pending'"
