@@ -9,6 +9,7 @@ import daily from "./daily.js";
 import leaderboard from "./leaderboard.js";
 import bet from "./bet.js";
 import mybets from "./mybets.js";
+import cancelmybet from "./cancelmybet.js";
 import history from "./history.js";
 import game from "./game.js";
 
@@ -28,6 +29,7 @@ export const commands: Command[] = [
   leaderboard,
   bet,
   mybets,
+  cancelmybet,
   history,
   game,
   // Admin commands
