@@ -5,7 +5,7 @@ import { buildBalanceEmbed } from "../utils/embeds.js";
 
 const command: Command = {
   data: new SlashCommandBuilder()
-    .setName("coins")
+    .setName("balance")
     .setDescription("Check your current 1912 Coins balance and betting stats."),
 
   async execute(interaction) {
